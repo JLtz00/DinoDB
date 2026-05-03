@@ -141,10 +141,10 @@ main              ← rama principal estable, solo recibe Pull Requests aprobado
 
 | Nombre | Módulo asignado |
 |--------|----------------|
-| Carlos Enrique Gutierrez Castilla | Storage Manager |
-| Fernando Antonio Gama Llicahua | Buffer Manager |
-| Job Lorenzo Quispe Torrez | B+ Tree Index |
-| Diego Mauricio Villanueva Flores | Query Processor |
+| Carlos Enrique Gutierrez Castilla 
+| Fernando Antonio Gama Llicahua 
+| Job Lorenzo Quispe Torrez 
+| Diego Mauricio Villanueva Flores 
 
 ---
 

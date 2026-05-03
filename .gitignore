@@ -1,0 +1,25 @@
+# Compilación
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.out
+
+# Datos generados en ejecución
+data/*.db
+data/*.bin
+!data/.gitkeep
+
+# Documentación generada
+docs/html/
+docs/latex/
+!docs/.gitkeep
+
+# IDEs
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
