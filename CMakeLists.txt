@@ -12,10 +12,7 @@ endif()
 include_directories(include)
 
 add_subdirectory(src/common)
-# add_subdirectory(src/storage)   # Fase 1
-# add_subdirectory(src/buffer)    # Fase 2
-# add_subdirectory(src/index)     # Fase 3
-# add_subdirectory(src/query)     # Fase 4
+add_subdirectory(src/storage)
 
-# enable_testing()
-# add_subdirectory(tests)
+enable_testing()
+add_subdirectory(tests)

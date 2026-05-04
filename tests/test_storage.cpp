@@ -18,8 +18,7 @@
 #include <filesystem>
 
 // ── Helpers ──────────────────────────────────────────────────
-static const std::string TEST_DB = "data/test_storage.db";
-
+static const std::string TEST_DB = "/Users/carlosgc/Desktop/DINO_DB/DinoDB/data/test_storage.db";
 void cleanup() {
     if (std::filesystem::exists(TEST_DB))
         std::filesystem::remove(TEST_DB);
