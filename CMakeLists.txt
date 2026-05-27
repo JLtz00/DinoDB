@@ -14,6 +14,7 @@ include_directories(include)
 add_subdirectory(src/common)
 add_subdirectory(src/storage)
 add_subdirectory(src/buffer)
+add_subdirectory(src/index)
 
 enable_testing()
 add_subdirectory(tests)
