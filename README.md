@@ -42,8 +42,8 @@ El sistema está organizado en **4 capas**, construidas de abajo hacia arriba:
 
 | Módulo | Descripción | Estado |
 |--------|-------------|--------|
-| **Storage Manager** | Persistencia en disco con archivos binarios, páginas fijas de 4 KB y Slot Directory | 🔲 Pendiente |
-| **Buffer Manager** | Buffer Pool configurable en RAM, política de reemplazo LRU, estados dirty/pinned | 🔲 Pendiente |
+| **Storage Manager** | Persistencia en disco con archivos binarios, páginas fijas de 4 KB y Slot Directory | ✅ Implementado y probado |
+| **Buffer Manager** | Buffer Pool configurable en RAM, política de reemplazo LRU, estados dirty/pinned | ✅ Implementado y probado |
 | **B+ Tree Index** | Árbol B+ integrado con el Buffer Manager, búsqueda puntual y por rango | 🔲 Pendiente |
 | **Query Processor** | Modelo Volcano: operadores Selection, Projection y Nested Loop Join | 🔲 Pendiente |
 
@@ -76,7 +76,7 @@ El desarrollo sigue un orden estricto: **cada capa depende de la anterior**.
 | Fase | Módulo | Contenido principal |
 |------|--------|---------------------|
 | **Fase 1** | Storage Manager | `Page` (4 KB), `SlotDirectory`, `DiskManager` (read/write binario) |
-| **Fase 2** | Buffer Manager | `BufferPool`, `Frame`, `LRUReplacer` (lista enlazada + hashmap) |
+| **Fase 2** | Buffer Manager | `BufferPool`, `Frame`, `LRUReplacer` (lista enlazada + hashmap), `fetch/unpin/flush` |
 | **Fase 3** | B+ Tree | Nodos como páginas del Buffer Manager, insert, search, range scan |
 | **Fase 4** | Query Processor | Interfaz `Operator`, `SeqScan`, `Selection`, `Projection`, `NLJoin` |
 
@@ -109,6 +109,13 @@ cmake --build .
 # 5. Ejecutar pruebas
 ctest --output-on-failure
 ```
+
+### Estado de pruebas
+
+La rama `dev/carlos` cuenta con 36 pruebas automatizadas:
+
+- `test_storage_full`: 20 pruebas de `FileWriter`, `Page` y `DiskManager`.
+- `test_buffer_manager`: 16 pruebas de `LRUReplacer` y `BufferManager`.
 
 ---
 

@@ -39,8 +39,10 @@ public:
     bool can_fit(offset_t length) const;
     void compact();
 
-    page_id_t page_id()    const { return header_.page_id; }
-    slot_id_t slot_count() const { return header_.slot_count; }
+    page_id_t page_id()    const { return header().page_id; }
+    slot_id_t slot_count() const { return header().slot_count; }
+    char* raw_data() { return data_; }
+    const char* raw_data() const { return data_; }
 
 private:
     char data_[PAGE_SIZE];
@@ -60,6 +62,4 @@ private:
     size_t slot_dir_start() const {
         return PAGE_SIZE - header().slot_count * sizeof(SlotEntry);
     }
-
-    PageHeader& header_{ *reinterpret_cast<PageHeader*>(data_) };
 };

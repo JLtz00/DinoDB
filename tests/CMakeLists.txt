@@ -6,9 +6,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(test_storage test_storage.cpp)
-target_link_libraries(test_storage PRIVATE storage gtest_main)
-target_include_directories(test_storage PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_executable(test_storage_full test_storage_full.cpp)
+target_link_libraries(test_storage_full PRIVATE storage gtest_main)
+target_include_directories(test_storage_full PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(test_buffer_manager test_buffer_manager.cpp)
+target_link_libraries(test_buffer_manager PRIVATE buffer gtest_main)
+target_include_directories(test_buffer_manager PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
 include(GoogleTest)
-gtest_discover_tests(test_storage)
+gtest_discover_tests(test_storage_full)
+gtest_discover_tests(test_buffer_manager)

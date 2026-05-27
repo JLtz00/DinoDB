@@ -2,15 +2,22 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <limits>
 
 /// Tamaño fijo de cada página en bytes (4 KB)
 static constexpr size_t PAGE_SIZE = 4096;
 
 /// Identificador inválido para páginas (equivalente a null)
-static constexpr uint32_t INVALID_PAGE_ID = UINT32_MAX;
+static constexpr uint32_t INVALID_PAGE_ID = std::numeric_limits<uint32_t>::max();
+
+/// Identificador inválido para frames del Buffer Pool
+static constexpr int32_t INVALID_FRAME_ID = -1;
 
 /// Identificador único de una página en disco
 using page_id_t = uint32_t;
+
+/// Identificador de un frame dentro del Buffer Pool
+using frame_id_t = int32_t;
 
 /// Identificador de un slot dentro de una página
 using slot_id_t = uint16_t;

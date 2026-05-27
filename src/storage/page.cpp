@@ -9,14 +9,14 @@
 
 Page::Page(page_id_t pid) {
     std::memset(data_, 0, PAGE_SIZE);
-    header_.page_id         = pid;
-    header_.free_space_end  = sizeof(PageHeader);
-    header_.slot_count      = 0;
-    header_.free_slot_count = 0;
+    header().page_id         = pid;
+    header().free_space_end  = sizeof(PageHeader);
+    header().slot_count      = 0;
+    header().free_slot_count = 0;
 }
 
 Page Page::from_bytes(const char* raw) {
-    Page p;
+    Page p(INVALID_PAGE_ID);
     std::memcpy(p.data_, raw, PAGE_SIZE);
     return p;
 }
@@ -26,11 +26,12 @@ void Page::to_bytes(char* dest) const {
 }
 
 size_t Page::free_space() const {
-    return slot_dir_start() - header_.free_space_end;
+    return slot_dir_start() - header().free_space_end;
 }
 
 bool Page::can_fit(offset_t length) const {
-    return free_space() >= static_cast<size_t>(length) + sizeof(SlotEntry);
+    const size_t slot_overhead = header().free_slot_count > 0 ? 0 : sizeof(SlotEntry);
+    return free_space() >= static_cast<size_t>(length) + slot_overhead;
 }
 
 // ------------------------------------------------------------
@@ -57,20 +58,21 @@ slot_id_t Page::insert(const char* data, offset_t length) {
     }
 
     // Escribir dato en área libre
-    offset_t data_offset = header_.free_space_end;
+    offset_t data_offset = header().free_space_end;
     std::memcpy(data_ + data_offset, data, length);
-    header_.free_space_end += length;
+    header().free_space_end += length;
 
     // Buscar slot reciclable (tombstone: offset == 0)
-    if (header_.free_slot_count > 0) {
+    if (header().free_slot_count > 0) {
         SlotEntry* dir = reinterpret_cast<SlotEntry*>(data_ + PAGE_SIZE)
-                         - header_.slot_count;
-        for (slot_id_t i = 0; i < header_.slot_count; ++i) {
-            if (dir[i].offset == 0) {
-                dir[i].offset = data_offset;
-                dir[i].length = length;
-                --header_.free_slot_count;
-                return i;
+                         - header().slot_count;
+        for (slot_id_t sid = 0; sid < header().slot_count; ++sid) {
+            slot_id_t idx = header().slot_count - 1 - sid;
+            if (dir[idx].offset == 0) {
+                dir[idx].offset = data_offset;
+                dir[idx].length = length;
+                --header().free_slot_count;
+                return sid;
             }
         }
     }
@@ -79,11 +81,11 @@ slot_id_t Page::insert(const char* data, offset_t length) {
     // IMPORTANTE: incrementar slot_count ANTES de calcular dir
     // porque el nuevo slot queda en la posición [slot_count-1]
     // del nuevo directorio expandido
-    slot_id_t new_sid = header_.slot_count;
-    ++header_.slot_count;
+    slot_id_t new_sid = header().slot_count;
+    ++header().slot_count;
 
     SlotEntry* dir = reinterpret_cast<SlotEntry*>(data_ + PAGE_SIZE)
-                     - header_.slot_count;
+                     - header().slot_count;
     // El nuevo slot es dir[0] (el más lejano al final del archivo)
     dir[0].offset = data_offset;
     dir[0].length = length;
@@ -95,19 +97,19 @@ slot_id_t Page::insert(const char* data, offset_t length) {
 // read: retorna puntero interno al dato del slot indicado
 // ------------------------------------------------------------
 const char* Page::read(slot_id_t slot_id, offset_t& out_len) const {
-    if (slot_id >= header_.slot_count) {
+    if (slot_id >= header().slot_count) {
         throw std::runtime_error(
             "Page::read: slot_id " + std::to_string(slot_id) +
-            " fuera de rango (total=" + std::to_string(header_.slot_count) + ")"
+            " fuera de rango (total=" + std::to_string(header().slot_count) + ")"
         );
     }
 
     const SlotEntry* dir = reinterpret_cast<const SlotEntry*>(data_ + PAGE_SIZE)
-                           - header_.slot_count;
+                           - header().slot_count;
 
     // slot 0 → dir[slot_count-1], slot N-1 → dir[0]
     // Para acceder al slot_id correcto necesitamos invertir el índice
-    slot_id_t idx = header_.slot_count - 1 - slot_id;
+    slot_id_t idx = header().slot_count - 1 - slot_id;
     const SlotEntry& entry = dir[idx];
 
     if (entry.offset == 0) {
@@ -125,15 +127,15 @@ const char* Page::read(slot_id_t slot_id, offset_t& out_len) const {
 // remove: marca slot como tombstone
 // ------------------------------------------------------------
 void Page::remove(slot_id_t slot_id) {
-    if (slot_id >= header_.slot_count) {
+    if (slot_id >= header().slot_count) {
         throw std::runtime_error(
             "Page::remove: slot_id " + std::to_string(slot_id) + " inválido"
         );
     }
 
     SlotEntry* dir = reinterpret_cast<SlotEntry*>(data_ + PAGE_SIZE)
-                     - header_.slot_count;
-    slot_id_t idx = header_.slot_count - 1 - slot_id;
+                     - header().slot_count;
+    slot_id_t idx = header().slot_count - 1 - slot_id;
     SlotEntry& entry = dir[idx];
 
     if (entry.offset == 0) {
@@ -145,7 +147,7 @@ void Page::remove(slot_id_t slot_id) {
 
     entry.offset = 0;
     entry.length = 0;
-    ++header_.free_slot_count;
+    ++header().free_slot_count;
 }
 
 // ------------------------------------------------------------
@@ -156,17 +158,17 @@ void Page::compact() {
     std::memset(temp, 0, PAGE_SIZE);
 
     PageHeader* new_header = reinterpret_cast<PageHeader*>(temp);
-    *new_header = header_;
+    *new_header = header();
     new_header->free_space_end  = sizeof(PageHeader);
     new_header->slot_count      = 0;
     new_header->free_slot_count = 0;
 
     const SlotEntry* old_dir = reinterpret_cast<const SlotEntry*>(data_ + PAGE_SIZE)
-                               - header_.slot_count;
+                               - header().slot_count;
 
     // Recorrer slots en orden original (0..slot_count-1)
-    for (slot_id_t i = 0; i < header_.slot_count; ++i) {
-        slot_id_t idx = header_.slot_count - 1 - i;
+    for (slot_id_t i = 0; i < header().slot_count; ++i) {
+        slot_id_t idx = header().slot_count - 1 - i;
         if (old_dir[idx].offset == 0) continue;
 
         offset_t new_offset = new_header->free_space_end;
