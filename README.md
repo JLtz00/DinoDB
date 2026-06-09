@@ -44,7 +44,7 @@ El sistema está organizado en **4 capas**, construidas de abajo hacia arriba:
 |--------|-------------|--------|
 | **Storage Manager** | Persistencia en disco con archivos binarios, páginas fijas de 4 KB y Slot Directory | ✅ Implementado y probado |
 | **Buffer Manager** | Buffer Pool configurable en RAM, política de reemplazo LRU, estados dirty/pinned | ✅ Implementado y probado |
-| **B+ Tree Index** | Árbol B+ integrado con el Buffer Manager, búsqueda puntual y por rango | 🔲 Pendiente |
+| **B+ Tree Index** | Árbol B+ integrado con el Buffer Manager, búsqueda puntual y por rango | 🟡 Avance funcional |
 | **Query Processor** | Modelo Volcano: operadores Selection, Projection y Nested Loop Join | 🔲 Pendiente |
 
 ---
@@ -112,10 +112,12 @@ ctest --output-on-failure
 
 ### Estado de pruebas
 
-La rama `dev/carlos` cuenta con 36 pruebas automatizadas:
+La rama `dev/carlos` cuenta con pruebas automatizadas para las capas implementadas:
 
 - `test_storage_full`: 20 pruebas de `FileWriter`, `Page` y `DiskManager`.
 - `test_buffer_manager`: 16 pruebas de `LRUReplacer` y `BufferManager`.
+- `test_bplus_tree`: pruebas de inserción, búsqueda, actualización de claves, split de hojas y rangos.
+- `test_buffer_metrics`: pruebas de aciertos, fallos, `hit_rate` y reinicio de métricas.
 
 ---
 

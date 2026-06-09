@@ -82,3 +82,23 @@ TEST(BPlusTreeWeek08Test, SplitDeHojaYRango) {
 
     cleanup(path);
 }
+
+TEST(BPlusTreeWeek10Test, RangoInvertidoRetornaVacio) {
+    auto path = test_path("dinodb_week10_btree_empty_range.db");
+    cleanup(path);
+
+    DiskManager disk(path.string());
+    BufferManager buffer(8, &disk);
+    BPlusTree tree(&buffer);
+
+    for (int i = 0; i < 10; ++i) {
+        tree.insert(i, RID { static_cast<page_id_t>(i), 0 });
+    }
+
+    auto range = tree.range_scan(8, 3);
+
+    EXPECT_TRUE(range.empty());
+    EXPECT_FALSE(tree.search(99).has_value());
+
+    cleanup(path);
+}
