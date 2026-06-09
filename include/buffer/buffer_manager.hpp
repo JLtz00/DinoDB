@@ -32,6 +32,10 @@ public:
 
     size_t free_frames() const;
     bool in_pool(page_id_t page_id) const;
+    size_t cache_hits() const { return cache_hits_; }
+    size_t cache_misses() const { return cache_misses_; }
+    double hit_rate() const;
+    void reset_metrics();
 
 private:
     frame_id_t find_free_frame() const;
@@ -43,4 +47,6 @@ private:
     std::vector<Frame> frames_;
     std::unordered_map<page_id_t, frame_id_t> page_table_;
     std::unique_ptr<LRUReplacer> replacer_;
+    size_t cache_hits_ { 0 };
+    size_t cache_misses_ { 0 };
 };

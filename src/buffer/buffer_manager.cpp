@@ -25,12 +25,14 @@ BufferManager::BufferManager(size_t pool_size, DiskManager* disk_manager)
 Page* BufferManager::fetch_page(page_id_t page_id) {
     auto it = page_table_.find(page_id);
     if (it != page_table_.end()) {
+        ++cache_hits_;
         Frame& frame = frames_[it->second];
         ++frame.pin_count;
         replacer_->pin(it->second);
         return &frame.page;
     }
 
+    ++cache_misses_;
     frame_id_t frame_id = find_victim_frame();
     if (frame_id == INVALID_FRAME_ID) {
         throw std::runtime_error("BufferManager::fetch_page: pool lleno sin victimas");
@@ -145,6 +147,19 @@ size_t BufferManager::free_frames() const {
 
 bool BufferManager::in_pool(page_id_t page_id) const {
     return page_table_.find(page_id) != page_table_.end();
+}
+
+double BufferManager::hit_rate() const {
+    size_t total = cache_hits_ + cache_misses_;
+    if (total == 0) {
+        return 0.0;
+    }
+    return static_cast<double>(cache_hits_) / static_cast<double>(total);
+}
+
+void BufferManager::reset_metrics() {
+    cache_hits_ = 0;
+    cache_misses_ = 0;
 }
 
 frame_id_t BufferManager::find_free_frame() const {
