@@ -16,6 +16,7 @@ docs/html/
 docs/latex/
 !docs/.gitkeep
 
+
 # IDEs
 .vscode/
 .idea/
