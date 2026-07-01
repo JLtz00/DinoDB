@@ -3,6 +3,7 @@ add_library(query
     selection.cpp
     projection.cpp
     nested_loop_join.cpp
+    external_merge_sort.cpp
 )
 
 target_include_directories(query PUBLIC ${PROJECT_SOURCE_DIR}/include)
