@@ -22,8 +22,13 @@ add_executable(test_buffer_metrics test_buffer_metrics.cpp)
 target_link_libraries(test_buffer_metrics PRIVATE buffer gtest_main)
 target_include_directories(test_buffer_metrics PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
+add_executable(test_query_basic test_query_basic.cpp)
+target_link_libraries(test_query_basic PRIVATE query gtest_main)
+target_include_directories(test_query_basic PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
 include(GoogleTest)
 gtest_discover_tests(test_storage_full)
 gtest_discover_tests(test_buffer_manager)
 gtest_discover_tests(test_bplus_tree)
 gtest_discover_tests(test_buffer_metrics)
+gtest_discover_tests(test_query_basic)

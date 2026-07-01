@@ -15,6 +15,7 @@ add_subdirectory(src/common)
 add_subdirectory(src/storage)
 add_subdirectory(src/buffer)
 add_subdirectory(src/index)
+add_subdirectory(src/query)
 
 enable_testing()
 add_subdirectory(tests)
