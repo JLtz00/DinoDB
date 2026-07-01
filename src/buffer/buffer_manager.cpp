@@ -117,6 +117,10 @@ void BufferManager::flush_all() {
     disk_->flush();
 }
 
+page_id_t BufferManager::disk_page_count() const {
+    return disk_->page_count();
+}
+
 bool BufferManager::delete_page(page_id_t page_id) {
     auto it = page_table_.find(page_id);
     if (it == page_table_.end()) {

@@ -102,3 +102,40 @@ TEST(BPlusTreeWeek10Test, RangoInvertidoRetornaVacio) {
 
     cleanup(path);
 }
+
+TEST(BPlusTreeFinalTest, SplitInternoAlturaMayorADosYPersistencia) {
+    auto path = test_path("dinodb_final_btree_persistent.db");
+    cleanup(path);
+
+    {
+        DiskManager disk(path.string());
+        BufferManager buffer(32, &disk);
+        BPlusTree tree(&buffer);
+
+        for (int i = 0; i < 3000; ++i) {
+            tree.insert(i, RID { static_cast<page_id_t>(i + 5000), static_cast<slot_id_t>(i % 100) });
+        }
+
+        EXPECT_GT(tree.height(), 2u);
+        buffer.flush_all();
+    }
+
+    {
+        DiskManager disk(path.string());
+        BufferManager buffer(16, &disk);
+        BPlusTree reopened(&buffer);
+
+        EXPECT_GT(reopened.height(), 2u);
+        auto found = reopened.search(2048);
+        ASSERT_TRUE(found.has_value());
+        EXPECT_EQ(found->page_id, 7048u);
+        EXPECT_EQ(found->slot_id, 48u);
+
+        auto range = reopened.range_scan(2990, 2999);
+        ASSERT_EQ(range.size(), 10u);
+        EXPECT_EQ(range.front().page_id, 7990u);
+        EXPECT_EQ(range.back().page_id, 7999u);
+    }
+
+    cleanup(path);
+}

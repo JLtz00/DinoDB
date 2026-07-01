@@ -1,183 +1,324 @@
-# 🦖 Mini SGBD en C++
-### Proyecto — Base de Datos II
+# DinoDB - Mini SGBD en C++
+
+### Proyecto - Base de Datos II
 
 ![C++](https://img.shields.io/badge/C++-17-blue.svg)
 ![CMake](https://img.shields.io/badge/CMake-3.20+-green.svg)
-![Estado](https://img.shields.io/badge/Estado-Planeación-orange)
-![Licencia](https://img.shields.io/badge/Licencia-Académica-lightgrey)
+![Estado](https://img.shields.io/badge/Estado-Avance%20funcional-yellow)
+![Licencia](https://img.shields.io/badge/Licencia-Academica-lightgrey)
 
-> Proyecto académico enfocado en la construcción de un motor de base de datos desde cero en C++17, implementando sus componentes internos: Storage Manager, Buffer Manager, B+ Tree e índices, y un procesador de consultas con el modelo Volcano.
-
----
-
-## 📌 Descripción
-
-Este proyecto tiene como objetivo desarrollar un **Mini Sistema Gestor de Bases de Datos (SGBD)** en **C++17**, con fines educativos.
-
-La intención es comprender cómo funcionan internamente los sistemas gestores de bases de datos, implementando sus componentes principales desde un nivel bajo, en lugar de utilizar soluciones ya existentes.
-
-Se busca responder a la siguiente pregunta:
-
-> *¿Cómo puede un sistema almacenar, organizar y recuperar datos de manera eficiente?*
+DinoDB es un Mini Sistema Gestor de Bases de Datos desarrollado en C++17 con fines academicos. El objetivo del proyecto es construir desde cero los componentes internos basicos de un motor de almacenamiento y consultas: paginas persistentes, Buffer Manager, indice B+ Tree y operadores relacionales bajo el modelo Volcano.
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## Estado Actual
 
-El sistema está organizado en **4 capas**, construidas de abajo hacia arriba:
+El proyecto ya cuenta con una base funcional y probada para la sustentacion practica. La suite automatizada actual valida Storage, Buffer, B+ Tree, metricas, operadores de consulta, `IndexScan` y la demo final.
 
-```
-┌─────────────────────────────────────┐
-│     Query Processor  (Volcano)      │  ← Capa 4
-├─────────────────────────────────────┤
-│     Índice  (B+ Tree)               │  ← Capa 3
-├─────────────────────────────────────┤
-│     Buffer Manager  (LRU Pool)      │  ← Capa 2
-├─────────────────────────────────────┤
-│     Storage Manager  (Disco/I-O)    │  ← Capa 1
-└─────────────────────────────────────┘
-```
-
-### Módulos
-
-| Módulo | Descripción | Estado |
-|--------|-------------|--------|
-| **Storage Manager** | Persistencia en disco con archivos binarios, páginas fijas de 4 KB y Slot Directory | ✅ Implementado y probado |
-| **Buffer Manager** | Buffer Pool configurable en RAM, política de reemplazo LRU, estados dirty/pinned | ✅ Implementado y probado |
-| **B+ Tree Index** | Árbol B+ integrado con el Buffer Manager, búsqueda puntual y por rango | 🟡 Avance funcional |
-| **Query Processor** | Modelo Volcano: operadores Selection, Projection y Nested Loop Join | 🟡 Avance funcional |
+| Modulo | Estado | Alcance actual |
+|--------|--------|----------------|
+| Storage Manager | Implementado y probado | Archivos binarios, paginas fijas de 4 KB, Slot Directory, insercion, lectura, eliminacion, compactacion y persistencia. |
+| Buffer Manager | Implementado y probado | Buffer Pool configurable, Page Table, LRU, pin/unpin, dirty bit, flush y metricas de hit rate. |
+| B+ Tree Index | Implementado y probado | Nodos almacenados como paginas mediante Buffer Manager, busqueda puntual, rango, split de hojas, split de nodos internos, altura mayor a 2 y metadatos persistentes. |
+| Query Processor | Avance funcional | Modelo Volcano con `SeqScan` en memoria o sobre paginas persistentes, `Selection`, `Projection`, `NestedLoopJoin`, `ExternalMergeSort` con runs temporales e `IndexScan`. |
+| Demo final | Implementada | Ejecutable `dinodb_demo` que carga 10,000 registros, construye indice, compara scan secuencial vs indice y muestra metricas del Buffer Manager. |
 
 ---
 
-## 📁 Estructura del Repositorio
+## Arquitectura
 
+El sistema esta organizado en capas. Cada capa superior depende de los servicios de la capa inferior.
+
+```text
++-------------------------------------+
+| Query Processor  (Volcano)          |
+| SeqScan, Selection, Projection,     |
+| NestedLoopJoin, ExternalMergeSort,  |
+| IndexScan                           |
++-------------------------------------+
+| B+ Tree Index                       |
+| insert, search, range_scan, splits, |
+| metadata persistente                |
++-------------------------------------+
+| Buffer Manager                      |
+| Buffer Pool, Page Table, LRU,       |
+| pin/unpin, dirty bit, hit rate      |
++-------------------------------------+
+| Storage Manager                     |
+| FileWriter, DiskManager, Page,      |
+| Slot Directory, fsync               |
++-------------------------------------+
 ```
-mini-sgbd/
+
+---
+
+## Estructura del Repositorio
+
+```text
+DinoDB/
+├── include/
+│   ├── buffer/          # BufferManager, LRUReplacer
+│   ├── common/          # Types, RID, constantes comunes
+│   ├── index/           # BPlusTree
+│   ├── query/           # Operadores Volcano e IndexScan
+│   └── storage/         # Page, DiskManager, FileWriter
 ├── src/
-│   ├── storage/          # DiskManager, Page, SlotDirectory
-│   ├── buffer/           # BufferPool, Frame, LRUReplacer
-│   ├── index/            # BPlusTree, BPlusNode
-│   ├── query/            # Operator, SeqScan, Selection, Projection, NLJoin
-│   └── common/           # Types, RID, Config
-├── include/              # Headers (.h / .hpp)
-├── tests/                # Google Test — un archivo por módulo
-├── data/                 # Archivos .db generados en ejecución (ignorados por git)
-├── docs/                 # Documentación generada por Doxygen
+│   ├── buffer/
+│   ├── demo/            # dinodb_demo.cpp
+│   ├── index/
+│   ├── query/
+│   └── storage/
+├── tests/               # Pruebas con Google Test
+├── docs/                # Avances/documentacion semanal
+├── data/                # Archivos .db generados en ejecucion
 ├── CMakeLists.txt
 └── README.md
 ```
 
 ---
 
-## 🗺️ Fases de Implementación
+## Compilacion
 
-El desarrollo sigue un orden estricto: **cada capa depende de la anterior**.
+Requisitos:
 
-| Fase | Módulo | Contenido principal |
-|------|--------|---------------------|
-| **Fase 1** | Storage Manager | `Page` (4 KB), `SlotDirectory`, `DiskManager` (read/write binario) |
-| **Fase 2** | Buffer Manager | `BufferPool`, `Frame`, `LRUReplacer` (lista enlazada + hashmap), `fetch/unpin/flush` |
-| **Fase 3** | B+ Tree | Nodos como páginas del Buffer Manager, insert, search, range scan |
-| **Fase 4** | Query Processor | Interfaz `Operator`, `SeqScan`, `Selection`, `Projection`, `NLJoin`, `ExternalMergeSort` |
+- Compilador C++17: GCC 12+ o Clang 15+.
+- CMake 3.20 o superior.
+- Git.
 
----
-
-## ⚙️ Compilación y Ejecución
-
-### Requisitos previos
-
-- Compilador con soporte C++17: GCC 12+ o Clang 15+
-- CMake 3.20 o superior
-- Git
-
-### Pasos
+Se recomienda usar un directorio de build nuevo. Si existe un `build/` antiguo generado desde otra ruta, puede fallar por cache de CMake.
 
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/equipo/mini-sgbd.git
-cd mini-sgbd
+cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
+cmake -S . -B build-local
+cmake --build build-local
+```
 
-# 2. Crear directorio de compilación
-mkdir build && cd build
+Ejecutar pruebas:
 
-# 3. Configurar con CMake
-cmake ..
-
-# 4. Compilar
-cmake --build .
-
-# 5. Ejecutar pruebas
+```bash
+cd build-local
 ctest --output-on-failure
 ```
 
-### Estado de pruebas
+Ejecutar benchmarks reproducibles:
 
-La rama `dev/carlos` cuenta con pruebas automatizadas para las capas implementadas:
+```bash
+cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
+./build-local/bench_scan_vs_index 10000 7777
+./build-local/bench_buffer_hit_rate 256
+```
 
-- `test_storage_full`: 20 pruebas de `FileWriter`, `Page` y `DiskManager`.
-- `test_buffer_manager`: 16 pruebas de `LRUReplacer` y `BufferManager`.
-- `test_bplus_tree`: pruebas de inserción, búsqueda, actualización de claves, split de hojas y rangos.
-- `test_buffer_metrics`: pruebas de aciertos, fallos, `hit_rate` y reinicio de métricas.
-- `test_query_basic`: pruebas de `SeqScan`, `Selection` y `Projection`.
-- `test_query_join`: pruebas de `NestedLoopJoin`.
-- `test_query_sort`: pruebas de `ExternalMergeSort`.
+Ejecutar la demo final:
+
+```bash
+cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
+./build-local/dinodb_demo
+```
+
+Salida esperada aproximada:
+
+```text
+DinoDB demo final
+Registros cargados: 10000
+Altura B+ Tree: 3
+Busqueda secuencial key=7777: encontrado en ... us
+Busqueda por indice key=7777: encontrado en ... us
+Buffer hits: ...
+Range IndexScan [100,109]: 10 tuplas
+```
 
 ---
 
-## 🌿 Convención de Ramas Git
+## Pruebas Automatizadas
 
+La suite cubre los modulos principales:
+
+- `test_storage_full`: `FileWriter`, `Page`, `DiskManager`, serializacion y persistencia.
+- `test_buffer_manager`: Buffer Pool, LRU, pin/unpin, dirty bit, flush y delete.
+- `test_bplus_tree`: insercion, busqueda, actualizacion, rangos, split de hojas, split interno, altura mayor a 2 y reapertura del indice desde disco.
+- `test_buffer_metrics`: aciertos, fallos, `hit_rate` y reinicio de metricas.
+- `test_query_basic`: `SeqScan` en memoria, `SeqScan` sobre paginas persistentes, `Selection` y `Projection`.
+- `test_query_join`: `NestedLoopJoin`.
+- `test_query_sort`: `ExternalMergeSort` con runs temporales persistidos.
+- `test_query_index`: `IndexScan` puntual y por rango usando B+ Tree.
+
+Ultima verificacion realizada en build temporal: 50/50 pruebas exitosas.
+
+---
+
+## DinoDB CLI - Semana 13
+
+`dinodb_cli` es una demo por comandos enfocada en el avance hasta Semana 13: Storage Manager, Buffer Manager y B+ Tree persistente. No intenta ser SQL ni cubrir los operadores de Semana 14/15.
+
+Comandos principales:
+
+```bash
+./build-local/dinodb_cli init
+./build-local/dinodb_cli insert 10 100
+./build-local/dinodb_cli insert-bulk 10000
+./build-local/dinodb_cli find 7777
+./build-local/dinodb_cli range 100 109
+./build-local/dinodb_cli stats
+./build-local/dinodb_cli reopen-check 7777
 ```
-main              ← rama principal estable, solo recibe Pull Requests aprobados
+
+La CLI usa por defecto:
+
+```text
+data/dinodb_cli_table.db
+data/dinodb_cli_index.db
+```
+
+Tambien se puede indicar otro directorio al final de cada comando:
+
+```bash
+./build-local/dinodb_cli init data/semana13
+./build-local/dinodb_cli insert-bulk 10000 data/semana13
+./build-local/dinodb_cli find 7777 data/semana13
+```
+
+Esta demo permite mostrar que los registros se guardan en paginas/slots reales, que el indice B+ persiste en disco, que se puede reabrir el arbol y que las busquedas/rangos pasan por el Buffer Manager.
+
+---
+
+## Demo Practica
+
+`dinodb_demo` esta pensado para la sustentacion, no como una consola interactiva. La demo realiza automaticamente los pasos minimos solicitados por la consigna:
+
+1. Crea un archivo de indice en `data/dinodb_demo_index.db`.
+2. Carga 10,000 registros de prueba.
+3. Construye un B+ Tree persistido mediante Buffer Manager.
+4. Ejecuta una busqueda secuencial sobre la tabla.
+5. Ejecuta una busqueda por indice usando `IndexScan`.
+6. Ejecuta un rango `[100,109]`.
+7. Muestra altura del arbol, tiempos aproximados y metricas del Buffer Manager.
+
+Limitacion importante: `SeqScan` ya puede leer desde paginas persistentes mediante `PersistentTable`; la demo principal conserva una tabla en memoria para comparar facilmente con `IndexScan`.
+
+---
+
+## Roadmap de Prioridad Intermedia
+
+Estas mejoras aumentarian la fidelidad del proyecto como Mini SGBD, pero no son estrictamente necesarias para demostrar los modulos obligatorios ya implementados.
+
+| Mejora | Estado | Objetivo |
+|--------|--------|----------|
+| `SeqScan` sobre paginas reales | Implementado | `PersistentTable` serializa tuplas en slots reales y `SeqScan` puede recorrerlas desde disco. |
+| Tabla persistente | Implementado basico | `PersistentTable` inserta tuplas en paginas y devuelve `RID`; falta catalogo/esquema general. |
+| `ExternalMergeSort` con runs temporales | Implementado | Escribe runs binarios temporales y los consume durante el merge. |
+| Benchmarks reproducibles | Implementado | `bench_scan_vs_index` y `bench_buffer_hit_rate` generan salida CSV. |
+| CLI basico | Pendiente | Exponer comandos como `load`, `find`, `range`, `stats` y `demo` desde terminal. |
+| Build local recomendado | Documentado | `build-local/` esta ignorado por Git; regenerar con `cmake -S . -B build-local`. |
+
+---
+
+## Roadmap de Prioridad Baja / Documentacion
+
+Estas tareas mejoran la presentacion final, mantenibilidad y claridad del repositorio.
+
+| Mejora | Estado | Objetivo |
+|--------|--------|----------|
+| Informe final en PDF | Pendiente | Consolidar arquitectura, snippets clave, resultados y conclusiones. |
+| Diagramas renderizados | Pendiente | Incluir diagramas de arquitectura, flujo de Buffer Manager y estructura del B+ Tree. |
+| Capturas de consola | Pendiente | Agregar evidencia visual de compilacion, pruebas y ejecucion de `dinodb_demo`. |
+| Tabla de resultados | Pendiente | Documentar tiempos de scan vs indice y metricas de hit rate bajo varias cargas. |
+| Presentacion de sustentacion | Pendiente | Preparar diapositivas con decisiones de diseno y demostracion practica. |
+| Comentarios tecnicos finales | Parcial | Revisar que las funciones criticas tengan comentarios utiles sin sobrecomentar codigo evidente. |
+
+---
+
+## Limitaciones Conocidas
+
+- No hay parser SQL. Las consultas se construyen directamente con operadores C++.
+- No hay transacciones, WAL, rollback ni control de concurrencia.
+- No hay catalogo general de tablas e indices; el B+ Tree tiene metadatos propios, pero no existe un catalogo global del SGBD.
+- `IndexScan` todavia consume una `Table` en memoria; `SeqScan` ya soporta `PersistentTable`.
+- `ExternalMergeSort` usa runs temporales persistidos, pero el resultado final se materializa como `Table` en memoria.
+- No existe eliminacion completa en B+ Tree con redistribucion/fusion; la consigna la considera opcional o bonus.
+- `dinodb_demo` es reproducible y util para sustentacion, pero no es una aplicacion interactiva.
+
+---
+
+## Entregables Relacionados con la Consigna
+
+Estado frente a los puntos principales del trabajo final:
+
+| Requisito | Estado | Evidencia |
+|-----------|--------|-----------|
+| Storage Manager con archivos binarios | Cumplido | `FileWriter`, `DiskManager`, `Page`. |
+| Paginas fijas de 4 KB | Cumplido | `PAGE_SIZE = 4096`. |
+| Slot Directory | Cumplido | `PageHeader`, `SlotEntry`, operaciones de slot. |
+| Buffer Pool configurable | Cumplido | `BufferManager(pool_size, disk)`. |
+| LRU obligatorio | Cumplido | `LRUReplacer`. |
+| Pin, unpin y dirty bit | Cumplido | `BufferManager::fetch_page`, `unpin_page`, `flush_page`. |
+| B+ Tree integrado con Buffer Manager | Cumplido | Nodos leidos/escritos mediante `BufferManager`. |
+| Split de hojas e internos | Cumplido | Insercion recursiva y propagacion de splits. |
+| Metadatos persistentes del indice | Cumplido | Pagina header del B+ Tree. |
+| Volcano Model | Cumplido parcialmente | Operadores `open`, `next`, `close`. |
+| Selection y Projection | Cumplido | `Selection`, `Projection`. |
+| Join | Cumplido | `NestedLoopJoin`. |
+| External Merge Sort | Cumplido parcialmente | Runs temporales en disco y merge; resultado final materializado en memoria. |
+| Uso de indice en consultas | Cumplido parcialmente | `IndexScan` y benchmark scan vs indice; falta planner/CLI. |
+| Demo con 10,000 registros | Cumplido | `dinodb_demo`. |
+| Informe PDF, diagramas y capturas | Pendiente | Debe prepararse como entregable final. |
+
+---
+
+## Convencion de Ramas Git
+
+```text
+main
 ├── feature/storage-manager
 ├── feature/buffer-pool-lru
 ├── feature/bplus-tree
 ├── feature/query-processor
+├── feature/demo-final
 └── fix/nombre-del-bug
 ```
 
+Prefijos recomendados:
+
 | Prefijo | Uso |
 |---------|-----|
-| `feature/` | Implementación de un módulo o funcionalidad nueva |
-| `fix/` | Corrección de un bug |
-| `docs/` | Cambios solo de documentación |
-| `test/` | Adición o corrección de pruebas |
+| `feat/` | Funcionalidad nueva. |
+| `fix/` | Correccion de bugs. |
+| `docs/` | Cambios de documentacion. |
+| `test/` | Nuevas pruebas o correcciones de pruebas. |
+| `refactor/` | Reorganizacion interna sin cambiar comportamiento. |
 
-**Reglas de commits:**
-- Mensajes en formato: `tipo(módulo): descripción breve`
-- Ejemplos: `feat(storage): implementar SlotDirectory`, `fix(buffer): corregir puntero LRU`
-- Commits pequeños y frecuentes para evidenciar trabajo grupal
+Ejemplos:
 
----
-
-## 👥 Integrantes
-
-| Nombre | Módulo asignado |
-|--------|----------------|
-| Carlos Enrique Gutierrez Castilla 
-| Fernando Antonio Gama Llicahua 
-| Job Lorenzo Quispe Torrez 
-| Diego Mauricio Villanueva Flores 
+```text
+feat(index): implementar split de nodos internos
+test(query): agregar pruebas de IndexScan
+docs(readme): actualizar estado y roadmap
+```
 
 ---
 
-## 🏫 Información Académica
+## Integrantes
 
-- **Universidad:** Universidad Nacional de San Agustín de Arequipa
-- **Curso:** Base de Datos II
-- **Docente:** Maria Vilma Escobar Castillo
-- **Año:** 2026
+| Nombre |
+|--------|
+| Carlos Enrique Gutierrez Castilla |
+| Fernando Antonio Gama Llicahua |
+| Job Lorenzo Quispe Torrez |
+| Diego Mauricio Villanueva Flores |
 
 ---
 
-## 📚 Referencias Bibliográficas
+## Informacion Academica
+
+- Universidad: Universidad Nacional de San Agustin de Arequipa.
+- Curso: Base de Datos II.
+- Docente: Maria Vilma Escobar Castillo.
+- Año: 2026.
+
+---
+
+## Referencias Bibliograficas
 
 1. Ramakrishnan, R. & Gehrke, J. *Database Management Systems*, 3rd ed. McGraw-Hill, 2003.
-2. Graefe, G. *Volcano — An Extensible and Parallel Query Evaluation System*. IEEE TKDE, 1994.
+2. Graefe, G. *Volcano - An Extensible and Parallel Query Evaluation System*. IEEE TKDE, 1994.
 3. Comer, D. *The Ubiquitous B-Tree*. ACM Computing Surveys, 11(2), 1979.
 4. Silberschatz, A. et al. *Database System Concepts*, 7th ed. McGraw-Hill, 2019.
-
----
-
-## 🔄 Historial de Actualizaciones
-
-Este README será actualizado conforme se implementen los distintos módulos del sistema.

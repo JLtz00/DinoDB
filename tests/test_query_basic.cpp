@@ -2,6 +2,9 @@
 #include "query/projection.hpp"
 #include "query/selection.hpp"
 #include "query/seq_scan.hpp"
+#include "query/persistent_table.hpp"
+#include "storage/disk_manager.hpp"
+#include <filesystem>
 #include <memory>
 
 namespace {
@@ -36,4 +39,27 @@ TEST(QueryWeek11Test, SelectionProjectionVolcano) {
     ASSERT_EQ(rows.size(), 2u);
     EXPECT_EQ(rows[0].values, std::vector<int32_t>({ 2, 200 }));
     EXPECT_EQ(rows[1].values, std::vector<int32_t>({ 3, 300 }));
+}
+
+TEST(QueryWeek11Test, SeqScanLeeDesdePaginasPersistentes) {
+    auto path = std::filesystem::temp_directory_path() / "dinodb_seqscan_persistent.db";
+    if (std::filesystem::exists(path)) {
+        std::filesystem::remove(path);
+    }
+
+    DiskManager disk(path.string());
+    PersistentTable table(&disk);
+    table.insert(Tuple {{ 1, 10 }});
+    table.insert(Tuple {{ 2, 20 }});
+    table.insert(Tuple {{ 3, 30 }});
+    disk.flush();
+
+    SeqScan scan(table);
+    auto rows = collect(scan);
+
+    ASSERT_EQ(rows.size(), 3u);
+    EXPECT_EQ(rows[0].values, std::vector<int32_t>({ 1, 10 }));
+    EXPECT_EQ(rows[2].values, std::vector<int32_t>({ 3, 30 }));
+
+    std::filesystem::remove(path);
 }

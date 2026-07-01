@@ -1,5 +1,6 @@
 # Compilación
 build/
+build-local/
 cmake-build-*/
 *.o
 *.a
@@ -23,3 +24,6 @@ docs/latex/
 *.suo
 .DS_Store
 Thumbs.db
+
+Consigna_Trabajo_Final.md
+
