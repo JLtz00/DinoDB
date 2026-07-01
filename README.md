@@ -45,7 +45,7 @@ El sistema está organizado en **4 capas**, construidas de abajo hacia arriba:
 | **Storage Manager** | Persistencia en disco con archivos binarios, páginas fijas de 4 KB y Slot Directory | ✅ Implementado y probado |
 | **Buffer Manager** | Buffer Pool configurable en RAM, política de reemplazo LRU, estados dirty/pinned | ✅ Implementado y probado |
 | **B+ Tree Index** | Árbol B+ integrado con el Buffer Manager, búsqueda puntual y por rango | 🟡 Avance funcional |
-| **Query Processor** | Modelo Volcano: operadores Selection, Projection y Nested Loop Join | 🔲 Pendiente |
+| **Query Processor** | Modelo Volcano: operadores Selection, Projection y Nested Loop Join | 🟡 Avance funcional |
 
 ---
 
@@ -78,7 +78,7 @@ El desarrollo sigue un orden estricto: **cada capa depende de la anterior**.
 | **Fase 1** | Storage Manager | `Page` (4 KB), `SlotDirectory`, `DiskManager` (read/write binario) |
 | **Fase 2** | Buffer Manager | `BufferPool`, `Frame`, `LRUReplacer` (lista enlazada + hashmap), `fetch/unpin/flush` |
 | **Fase 3** | B+ Tree | Nodos como páginas del Buffer Manager, insert, search, range scan |
-| **Fase 4** | Query Processor | Interfaz `Operator`, `SeqScan`, `Selection`, `Projection`, `NLJoin` |
+| **Fase 4** | Query Processor | Interfaz `Operator`, `SeqScan`, `Selection`, `Projection`, `NLJoin`, `ExternalMergeSort` |
 
 ---
 
@@ -118,6 +118,9 @@ La rama `dev/carlos` cuenta con pruebas automatizadas para las capas implementad
 - `test_buffer_manager`: 16 pruebas de `LRUReplacer` y `BufferManager`.
 - `test_bplus_tree`: pruebas de inserción, búsqueda, actualización de claves, split de hojas y rangos.
 - `test_buffer_metrics`: pruebas de aciertos, fallos, `hit_rate` y reinicio de métricas.
+- `test_query_basic`: pruebas de `SeqScan`, `Selection` y `Projection`.
+- `test_query_join`: pruebas de `NestedLoopJoin`.
+- `test_query_sort`: pruebas de `ExternalMergeSort`.
 
 ---
 
