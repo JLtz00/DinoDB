@@ -1,5 +1,6 @@
 # Compilación
 build/
+build-local/
 cmake-build-*/
 *.o
 *.a
@@ -9,12 +10,10 @@ cmake-build-*/
 # Datos generados en ejecución
 data/*.db
 data/*.bin
-!data/.gitkeep
 
 # Documentación generada
 docs/html/
 docs/latex/
-!docs/.gitkeep
 
 
 # IDEs

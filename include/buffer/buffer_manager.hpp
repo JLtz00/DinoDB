@@ -29,6 +29,7 @@ public:
     bool flush_page(page_id_t page_id);
     void flush_all();
     bool delete_page(page_id_t page_id);
+    page_id_t disk_page_count() const;
 
     size_t free_frames() const;
     bool in_pool(page_id_t page_id) const;

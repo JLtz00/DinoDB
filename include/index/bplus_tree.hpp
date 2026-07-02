@@ -22,12 +22,22 @@ public:
     std::vector<RID> range_scan(int32_t start_key, int32_t end_key);
 
     page_id_t root_page_id() const { return root_page_id_; }
-    size_t height() const { return root_is_leaf_ ? 1 : 2; }
+    size_t height() const { return height_; }
 
 private:
+    static constexpr page_id_t HEADER_PAGE_ID = 0;
+    static constexpr uint32_t HEADER_MAGIC = 0x44425848; // DBXH
     static constexpr uint32_t NODE_MAGIC = 0x44425849; // DBXI
+    static constexpr uint16_t METADATA_VERSION = 1;
     static constexpr uint16_t MAX_LEAF_ENTRIES = 31;
     static constexpr uint16_t MAX_INTERNAL_KEYS = 63;
+
+    struct HeaderPage {
+        uint32_t magic { HEADER_MAGIC };
+        uint16_t version { METADATA_VERSION };
+        uint16_t height { 1 };
+        page_id_t root_page_id { INVALID_PAGE_ID };
+    };
 
     struct LeafNode {
         uint32_t magic { NODE_MAGIC };
@@ -52,8 +62,12 @@ private:
 
     BufferManager* buffer_;
     page_id_t root_page_id_ { INVALID_PAGE_ID };
-    bool root_is_leaf_ { true };
+    size_t height_ { 1 };
 
+    void initialize_new_tree();
+    void load_header();
+    void write_header();
+    bool is_leaf_page(page_id_t page_id);
     LeafNode read_leaf(page_id_t page_id);
     void write_leaf(page_id_t page_id, const LeafNode& node);
     InternalNode read_internal(page_id_t page_id);
@@ -62,6 +76,7 @@ private:
     page_id_t create_leaf();
     page_id_t create_internal();
     page_id_t find_leaf_page(int32_t key);
+    std::optional<SplitResult> insert_recursive(page_id_t page_id, int32_t key, RID rid);
     std::optional<SplitResult> insert_into_leaf(page_id_t leaf_page, int32_t key, RID rid);
-    void insert_into_root_internal(int32_t separator, page_id_t right_page);
+    std::optional<SplitResult> insert_into_internal(page_id_t internal_page, const SplitResult& child_split);
 };
