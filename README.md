@@ -70,7 +70,7 @@ DinoDB/
 │   └── storage/
 ├── tests/               # Pruebas con Google Test
 ├── docs/                # Avances/documentacion semanal
-├── data/                # Archivos .db generados en ejecucion
+├── data/                # Se genera en ejecucion; no versionada
 ├── CMakeLists.txt
 └── README.md
 ```

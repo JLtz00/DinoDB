@@ -10,12 +10,10 @@ cmake-build-*/
 # Datos generados en ejecución
 data/*.db
 data/*.bin
-!data/.gitkeep
 
 # Documentación generada
 docs/html/
 docs/latex/
-!docs/.gitkeep
 
 # IDEs
 .vscode/
