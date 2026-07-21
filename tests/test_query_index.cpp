@@ -2,6 +2,7 @@
 #include "buffer/buffer_manager.hpp"
 #include "index/bplus_tree.hpp"
 #include "query/index_scan.hpp"
+#include "query/persistent_table.hpp"
 #include <filesystem>
 
 namespace {
@@ -75,4 +76,80 @@ TEST(QueryIndexScanTest, RecorreRangoConBPlusTree) {
     EXPECT_EQ(keys.back(), 34);
 
     cleanup(path);
+}
+
+TEST(QueryIndexScanTest, BuscaClavePuntualEnTablaPersistente) {
+    auto table_path = test_path("dinodb_query_index_persistent_table_point.db");
+    auto index_path = test_path("dinodb_query_index_persistent_index_point.db");
+    cleanup(table_path);
+    cleanup(index_path);
+
+    DiskManager table_disk(table_path.string());
+    DiskManager index_disk(index_path.string());
+    PersistentTable table(&table_disk);
+    BufferManager buffer(8, &index_disk);
+    BPlusTree index(&buffer);
+
+    for (int i = 0; i < 40; ++i) {
+        RID rid = table.insert(Tuple {{ i, i * 10, i * 100 }});
+        index.insert(i, rid);
+    }
+    table_disk.flush();
+    buffer.flush_all();
+
+    IndexScan scan(index, table, 27);
+    scan.open();
+    auto row = scan.next();
+    auto done = scan.next();
+    scan.close();
+
+    ASSERT_TRUE(row.has_value());
+    EXPECT_EQ(row->values, std::vector<int32_t>({ 27, 270, 2700 }));
+    EXPECT_FALSE(done.has_value());
+
+    cleanup(table_path);
+    cleanup(index_path);
+}
+
+TEST(QueryIndexScanTest, RecorreRangoEnTablaPersistenteTrasReabrir) {
+    auto table_path = test_path("dinodb_query_index_persistent_table_range.db");
+    auto index_path = test_path("dinodb_query_index_persistent_index_range.db");
+    cleanup(table_path);
+    cleanup(index_path);
+
+    {
+        DiskManager table_disk(table_path.string());
+        DiskManager index_disk(index_path.string());
+        PersistentTable table(&table_disk);
+        BufferManager buffer(16, &index_disk);
+        BPlusTree index(&buffer);
+
+        for (int i = 0; i < 120; ++i) {
+            RID rid = table.insert(Tuple {{ i, i + 1000 }});
+            index.insert(i, rid);
+        }
+        table_disk.flush();
+        buffer.flush_all();
+    }
+
+    DiskManager table_disk(table_path.string());
+    DiskManager index_disk(index_path.string());
+    PersistentTable table(&table_disk);
+    BufferManager buffer(8, &index_disk);
+    BPlusTree index(&buffer);
+
+    IndexScan scan(index, table, 45, 54);
+    scan.open();
+    std::vector<int32_t> keys;
+    while (auto row = scan.next()) {
+        keys.push_back(row->get(0));
+    }
+    scan.close();
+
+    ASSERT_EQ(keys.size(), 10u);
+    EXPECT_EQ(keys.front(), 45);
+    EXPECT_EQ(keys.back(), 54);
+
+    cleanup(table_path);
+    cleanup(index_path);
 }

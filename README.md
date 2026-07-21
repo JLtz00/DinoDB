@@ -20,7 +20,7 @@ El proyecto ya cuenta con una base funcional y probada para la sustentacion prac
 | Storage Manager | Implementado y probado | Archivos binarios, paginas fijas de 4 KB, Slot Directory, insercion, lectura, eliminacion, compactacion y persistencia. |
 | Buffer Manager | Implementado y probado | Buffer Pool configurable, Page Table, LRU, pin/unpin, dirty bit, flush y metricas de hit rate. |
 | B+ Tree Index | Implementado y probado | Nodos almacenados como paginas mediante Buffer Manager, busqueda puntual, rango, split de hojas, split de nodos internos, altura mayor a 2 y metadatos persistentes. |
-| Query Processor | Avance funcional | Modelo Volcano con `SeqScan` en memoria o sobre paginas persistentes, `Selection`, `Projection`, `NestedLoopJoin`, `ExternalMergeSort` con runs temporales e `IndexScan`. |
+| Query Processor | Implementado y probado | Modelo Volcano con `SeqScan` en memoria o sobre paginas persistentes, `Selection`, `Projection`, `NestedLoopJoin`, `ExternalMergeSort` con runs temporales e `IndexScan` sobre tablas en memoria o persistentes. |
 | Demo final | Implementada | Ejecutable `dinodb_demo` que carga 10,000 registros, construye indice, compara scan secuencial vs indice y muestra metricas del Buffer Manager. |
 
 ---
@@ -142,13 +142,13 @@ La suite cubre los modulos principales:
 - `test_query_sort`: `ExternalMergeSort` con runs temporales persistidos.
 - `test_query_index`: `IndexScan` puntual y por rango usando B+ Tree.
 
-Ultima verificacion realizada en build temporal: 50/50 pruebas exitosas.
+Ultima verificacion realizada en `build-local`: 52/52 pruebas exitosas.
 
 ---
 
 ## DinoDB CLI - Semana 13
 
-`dinodb_cli` es una demo por comandos enfocada en el avance hasta Semana 13: Storage Manager, Buffer Manager y B+ Tree persistente. No intenta ser SQL ni cubrir los operadores de Semana 14/15.
+`dinodb_cli` es una demo por comandos enfocada en Storage Manager, Buffer Manager, B+ Tree persistente y consultas por indice mediante `IndexScan`. No intenta ser SQL.
 
 Comandos principales:
 
@@ -193,7 +193,7 @@ Esta demo permite mostrar que los registros se guardan en paginas/slots reales, 
 6. Ejecuta un rango `[100,109]`.
 7. Muestra altura del arbol, tiempos aproximados y metricas del Buffer Manager.
 
-Limitacion importante: `SeqScan` ya puede leer desde paginas persistentes mediante `PersistentTable`; la demo principal conserva una tabla en memoria para comparar facilmente con `IndexScan`.
+La demo principal usa una tabla persistente (`PersistentTable`) y un indice B+ separado. La busqueda secuencial pasa por `SeqScan`; la busqueda puntual y el rango pasan por `IndexScan`.
 
 ---
 
@@ -204,10 +204,10 @@ Estas mejoras aumentarian la fidelidad del proyecto como Mini SGBD, pero no son 
 | Mejora | Estado | Objetivo |
 |--------|--------|----------|
 | `SeqScan` sobre paginas reales | Implementado | `PersistentTable` serializa tuplas en slots reales y `SeqScan` puede recorrerlas desde disco. |
-| Tabla persistente | Implementado basico | `PersistentTable` inserta tuplas en paginas y devuelve `RID`; falta catalogo/esquema general. |
+| Tabla persistente | Implementado basico | `PersistentTable` inserta tuplas en paginas, lee por `RID` y permite recorrido secuencial; falta catalogo/esquema general. |
 | `ExternalMergeSort` con runs temporales | Implementado | Escribe runs binarios temporales y los consume durante el merge. |
 | Benchmarks reproducibles | Implementado | `bench_scan_vs_index` y `bench_buffer_hit_rate` generan salida CSV. |
-| CLI basico | Pendiente | Exponer comandos como `load`, `find`, `range`, `stats` y `demo` desde terminal. |
+| CLI basico | Implementado | Expone `init`, `insert`, `insert-bulk`, `find`, `range`, `stats` y `reopen-check` desde terminal. |
 | Build local recomendado | Documentado | `build-local/` esta ignorado por Git; regenerar con `cmake -S . -B build-local`. |
 
 ---
@@ -232,7 +232,7 @@ Estas tareas mejoran la presentacion final, mantenibilidad y claridad del reposi
 - No hay parser SQL. Las consultas se construyen directamente con operadores C++.
 - No hay transacciones, WAL, rollback ni control de concurrencia.
 - No hay catalogo general de tablas e indices; el B+ Tree tiene metadatos propios, pero no existe un catalogo global del SGBD.
-- `IndexScan` todavia consume una `Table` en memoria; `SeqScan` ya soporta `PersistentTable`.
+- No hay planner/catologo: `IndexScan` se construye manualmente en C++/CLI y requiere recibir el indice y la tabla.
 - `ExternalMergeSort` usa runs temporales persistidos, pero el resultado final se materializa como `Table` en memoria.
 - No existe eliminacion completa en B+ Tree con redistribucion/fusion; la consigna la considera opcional o bonus.
 - `dinodb_demo` es reproducible y util para sustentacion, pero no es una aplicacion interactiva.
@@ -254,11 +254,11 @@ Estado frente a los puntos principales del trabajo final:
 | B+ Tree integrado con Buffer Manager | Cumplido | Nodos leidos/escritos mediante `BufferManager`. |
 | Split de hojas e internos | Cumplido | Insercion recursiva y propagacion de splits. |
 | Metadatos persistentes del indice | Cumplido | Pagina header del B+ Tree. |
-| Volcano Model | Cumplido parcialmente | Operadores `open`, `next`, `close`. |
+| Volcano Model | Cumplido | Operadores `open`, `next`, `close` en scans, filtros, proyecciones, join e `IndexScan`. |
 | Selection y Projection | Cumplido | `Selection`, `Projection`. |
 | Join | Cumplido | `NestedLoopJoin`. |
 | External Merge Sort | Cumplido parcialmente | Runs temporales en disco y merge; resultado final materializado en memoria. |
-| Uso de indice en consultas | Cumplido parcialmente | `IndexScan` y benchmark scan vs indice; falta planner/CLI. |
+| Uso de indice en consultas | Cumplido | `IndexScan` puntual y por rango sobre tablas en memoria o persistentes; CLI y demo lo ejercitan. |
 | Demo con 10,000 registros | Cumplido | `dinodb_demo`. |
 | Informe PDF, diagramas y capturas | Pendiente | Debe prepararse como entregable final. |
 

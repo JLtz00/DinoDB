@@ -1,6 +1,7 @@
 #include "buffer/buffer_manager.hpp"
 #include "index/bplus_tree.hpp"
 #include "query/index_scan.hpp"
+#include "query/persistent_table.hpp"
 #include "query/seq_scan.hpp"
 #include <chrono>
 #include <filesystem>
@@ -9,17 +10,15 @@
 
 namespace {
 
-Table build_table(size_t rows) {
-    Table table;
-    table.reserve(rows);
+void load_table_and_index(PersistentTable& table, BPlusTree& index, size_t rows) {
     for (size_t i = 0; i < rows; ++i) {
         int32_t key = static_cast<int32_t>((i * 37) % rows);
-        table.push_back(Tuple {{ key, static_cast<int32_t>(i), static_cast<int32_t>(key * 10) }});
+        RID rid = table.insert(Tuple {{ key, static_cast<int32_t>(i), static_cast<int32_t>(key * 10) }});
+        index.insert(key, rid);
     }
-    return table;
 }
 
-std::optional<Tuple> sequential_find(const Table& table, int32_t key) {
+std::optional<Tuple> sequential_find(const PersistentTable& table, int32_t key) {
     SeqScan scan(table);
     scan.open();
     while (auto row = scan.next()) {
@@ -37,18 +36,20 @@ std::optional<Tuple> sequential_find(const Table& table, int32_t key) {
 int main() {
     constexpr size_t rows = 10000;
     constexpr int32_t target_key = 7777;
-    const std::filesystem::path db_path = std::filesystem::path("data") / "dinodb_demo_index.db";
-    std::filesystem::create_directories(db_path.parent_path());
-    std::filesystem::remove(db_path);
+    const std::filesystem::path data_dir = "data";
+    const std::filesystem::path table_path = data_dir / "dinodb_demo_table.db";
+    const std::filesystem::path index_path = data_dir / "dinodb_demo_index.db";
+    std::filesystem::create_directories(data_dir);
+    std::filesystem::remove(table_path);
+    std::filesystem::remove(index_path);
 
-    DiskManager disk(db_path.string());
-    BufferManager buffer(128, &disk);
+    DiskManager table_disk(table_path.string());
+    DiskManager index_disk(index_path.string());
+    PersistentTable table(&table_disk);
+    BufferManager buffer(128, &index_disk);
     BPlusTree index(&buffer);
-    Table table = build_table(rows);
-
-    for (size_t i = 0; i < table.size(); ++i) {
-        index.insert(table[i].get(0), RID { static_cast<page_id_t>(i), 0 });
-    }
+    load_table_and_index(table, index, rows);
+    table_disk.flush();
     buffer.flush_all();
 
     auto scan_start = std::chrono::steady_clock::now();

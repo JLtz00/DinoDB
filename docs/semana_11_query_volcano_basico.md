@@ -11,6 +11,8 @@ el modelo Volcano.
 - Se define `Table` como coleccion de tuplas en memoria.
 - Se agrega la interfaz abstracta `Operator`.
 - Se implementa `SeqScan` para recorrer una tabla.
+- `SeqScan` tambien puede recorrer una `PersistentTable` almacenada en paginas
+  con Slot Directory.
 - Se implementa `Selection` para filtrar tuplas con un predicado.
 - Se implementa `Projection` para seleccionar columnas.
 
@@ -28,11 +30,12 @@ incremental.
 ## Pruebas
 
 Se valida una tuberia `SeqScan -> Selection -> Projection`, verificando que el
-filtro y la proyeccion produzcan las filas esperadas.
+filtro y la proyeccion produzcan las filas esperadas. Tambien se valida el
+recorrido secuencial desde paginas persistentes.
 
 ## Pendiente
 
 - Operadores binarios.
 - Joins.
 - Ordenamiento externo.
-- Integracion con almacenamiento persistente.
+- Planner SQL/catalogo general.

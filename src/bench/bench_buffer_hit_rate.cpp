@@ -1,4 +1,5 @@
 #include "buffer/buffer_manager.hpp"
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <vector>
@@ -6,6 +7,9 @@
 int main(int argc, char** argv) {
     size_t pages = argc > 1 ? static_cast<size_t>(std::stoul(argv[1])) : 256;
     std::vector<size_t> pool_sizes { 4, 16, 64 };
+    if (std::find(pool_sizes.begin(), pool_sizes.end(), pages) == pool_sizes.end()) {
+        pool_sizes.push_back(pages);
+    }
 
     std::filesystem::create_directories("data");
     std::filesystem::path db_path = "data/bench_buffer_hit_rate.db";

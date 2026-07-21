@@ -12,11 +12,13 @@ para futuros operadores que requieran orden.
 - Se ordena cada corrida por una columna clave.
 - Se fusionan las corridas tomando el menor elemento disponible.
 - Se normaliza `memory_limit_rows = 0` a una fila para evitar corridas vacias.
+- Las corridas temporales se escriben como archivos binarios y se eliminan al
+  finalizar el merge.
 
 ## Uso esperado
 
-Aunque esta version trabaja sobre tablas en memoria, el flujo replica el
-enfoque de un external merge sort:
+La entrada y salida final siguen usando `Table`, pero las corridas intermedias
+se materializan en disco para replicar el flujo de un external merge sort:
 
 1. Crear corridas.
 2. Ordenar cada corrida.
@@ -24,10 +26,10 @@ enfoque de un external merge sort:
 
 ## Pruebas
 
-Se valida que una tabla desordenada quede ordenada por la columna seleccionada.
+Se valida que una tabla desordenada quede ordenada por la columna seleccionada
+y que las corridas temporales no queden como basura tras finalizar.
 
 ## Pendiente
 
-- Escribir corridas temporales a disco.
 - Fusion multiway con Buffer Manager.
 - Integracion con `ORDER BY`.

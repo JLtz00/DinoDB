@@ -1,5 +1,6 @@
 #include "buffer/buffer_manager.hpp"
 #include "index/bplus_tree.hpp"
+#include "query/index_scan.hpp"
 #include "query/persistent_table.hpp"
 #include <cstdlib>
 #include <filesystem>
@@ -148,16 +149,15 @@ int cmd_find(const Paths& paths, int32_t key) {
     BPlusTree index(&buffer);
     buffer.reset_metrics();
 
+    IndexScan scan(index, table, key);
+    scan.open();
+    auto tuple = scan.next();
+    scan.close();
+
     auto rid = index.search(key);
-    if (!rid.has_value()) {
+    if (!tuple.has_value() || !rid.has_value()) {
         std::cout << "not-found key=" << key << "\n";
         return 1;
-    }
-
-    auto tuple = table.read(*rid);
-    if (!tuple.has_value()) {
-        std::cout << "dangling-rid key=" << key << " page=" << rid->page_id << " slot=" << rid->slot_id << "\n";
-        return 2;
     }
 
     std::cout << "found key=" << key << " rid=(page=" << rid->page_id << ", slot=" << rid->slot_id << ") tuple=";
@@ -176,18 +176,16 @@ int cmd_range(const Paths& paths, int32_t start, int32_t end) {
     BPlusTree index(&buffer);
     buffer.reset_metrics();
 
-    auto rids = index.range_scan(start, end);
+    IndexScan scan(index, table, start, end);
+    scan.open();
     size_t printed = 0;
-    for (RID rid : rids) {
-        auto tuple = table.read(rid);
-        if (!tuple.has_value()) {
-            continue;
-        }
-        std::cout << "row rid=(page=" << rid.page_id << ", slot=" << rid.slot_id << ") tuple=";
+    while (auto tuple = scan.next()) {
+        std::cout << "row tuple=";
         print_tuple(*tuple);
         std::cout << "\n";
         ++printed;
     }
+    scan.close();
 
     std::cout << "range start=" << start << " end=" << end
               << " rows=" << printed
