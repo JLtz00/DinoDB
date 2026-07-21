@@ -4,6 +4,7 @@
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <stdexcept>
 #include <string>
 #include <unistd.h>
@@ -78,6 +79,12 @@ std::filesystem::path make_run_path(const std::filesystem::path& temp_dir, size_
     return temp_dir / ("dinodb_sort_run_" + std::to_string(::getpid()) + "_" + std::to_string(index) + ".bin");
 }
 
+struct HeapEntry {
+    Tuple tuple;
+    size_t reader_index { 0 };
+    size_t sequence { 0 };
+};
+
 } // namespace
 
 Table ExternalMergeSort::sort(const Table& input, size_t key_column, size_t memory_limit_rows) {
@@ -121,21 +128,37 @@ Table ExternalMergeSort::sort(const Table& input,
 
     Table result;
     result.reserve(input.size());
-    while (result.size() < input.size()) {
-        size_t best = readers.size();
-        for (size_t i = 0; i < readers.size(); ++i) {
-            if (!readers[i]->has_value()) {
-                continue;
-            }
-            if (best == readers.size() ||
-                readers[i]->current().get(key_column) < readers[best]->current().get(key_column)) {
-                best = i;
-            }
+
+    auto compare = [key_column](const HeapEntry& a, const HeapEntry& b) {
+        int32_t a_key = a.tuple.get(key_column);
+        int32_t b_key = b.tuple.get(key_column);
+        if (a_key != b_key) {
+            return a_key > b_key;
         }
-        if (best == readers.size()) {
-            throw std::runtime_error("ExternalMergeSort: merge incompleto");
+        return a.sequence > b.sequence;
+    };
+    std::priority_queue<HeapEntry, std::vector<HeapEntry>, decltype(compare)> heap(compare);
+
+    size_t sequence = 0;
+    for (size_t i = 0; i < readers.size(); ++i) {
+        if (readers[i]->has_value()) {
+            heap.push(HeapEntry { readers[i]->pop(), i, sequence++ });
         }
-        result.push_back(readers[best]->pop());
+    }
+
+    while (!heap.empty()) {
+        HeapEntry entry = heap.top();
+        heap.pop();
+        size_t reader_index = entry.reader_index;
+        result.push_back(std::move(entry.tuple));
+
+        if (readers[reader_index]->has_value()) {
+            heap.push(HeapEntry { readers[reader_index]->pop(), reader_index, sequence++ });
+        }
+    }
+
+    if (result.size() != input.size()) {
+        throw std::runtime_error("ExternalMergeSort: merge incompleto");
     }
 
     return result;

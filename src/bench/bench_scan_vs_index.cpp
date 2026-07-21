@@ -1,5 +1,6 @@
 #include "buffer/buffer_manager.hpp"
 #include "index/bplus_tree.hpp"
+#include "query/index_scan.hpp"
 #include "query/persistent_table.hpp"
 #include "query/seq_scan.hpp"
 #include <chrono>
@@ -54,8 +55,10 @@ int main(int argc, char** argv) {
 
     buffer.reset_metrics();
     auto index_start = std::chrono::steady_clock::now();
-    auto rid = index.search(target);
-    auto index_tuple = rid ? table.read(*rid) : std::nullopt;
+    IndexScan index_scan(index, table, target);
+    index_scan.open();
+    auto index_tuple = index_scan.next();
+    index_scan.close();
     auto index_end = std::chrono::steady_clock::now();
 
     auto scan_us = std::chrono::duration_cast<std::chrono::microseconds>(scan_end - scan_start).count();

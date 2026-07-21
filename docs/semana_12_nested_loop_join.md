@@ -11,6 +11,9 @@ Agregar el primer operador binario del Query Processor: `NestedLoopJoin`.
 - Se recibe un predicado de join configurable.
 - Se materializa el lado derecho para poder compararlo con cada tupla izquierda.
 - Se concatenan los valores de ambas tuplas cuando el predicado coincide.
+- Se agrega `IndexScan` para consultas puntuales y por rango usando el B+ Tree.
+- `IndexScan` puede resolver los `RID` contra tablas en memoria o contra
+  `PersistentTable`.
 
 ## Flujo
 
@@ -22,10 +25,11 @@ Agregar el primer operador binario del Query Processor: `NestedLoopJoin`.
 ## Pruebas
 
 Se valida un join entre empleados y departamentos usando una igualdad entre
-columnas.
+columnas. Tambien se prueban busquedas por indice puntuales y por rango,
+incluyendo tabla persistente reabierta desde disco.
 
 ## Pendiente
 
 - Costos estimados.
-- Joins indexados.
 - Joins por bloques.
+- Planner SQL/catalogo general.
