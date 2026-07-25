@@ -1,4 +1,5 @@
 #include "query/external_merge_sort.hpp"
+#include "query/tuple_codec.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -12,25 +13,22 @@
 namespace {
 
 void write_tuple(std::ofstream& out, const Tuple& tuple) {
-    uint32_t columns = static_cast<uint32_t>(tuple.values.size());
-    out.write(reinterpret_cast<const char*>(&columns), sizeof(columns));
-    for (int32_t value : tuple.values) {
-        out.write(reinterpret_cast<const char*>(&value), sizeof(value));
-    }
+    std::string encoded = TupleCodec::serialize(tuple);
+    uint32_t length = static_cast<uint32_t>(encoded.size());
+    out.write(reinterpret_cast<const char*>(&length), sizeof(length));
+    out.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
 }
 
 bool read_tuple(std::ifstream& in, Tuple& tuple) {
-    uint32_t columns = 0;
-    if (!in.read(reinterpret_cast<char*>(&columns), sizeof(columns))) {
+    uint32_t length = 0;
+    if (!in.read(reinterpret_cast<char*>(&length), sizeof(length))) {
         return false;
     }
-
-    tuple.values.assign(columns, 0);
-    for (uint32_t i = 0; i < columns; ++i) {
-        if (!in.read(reinterpret_cast<char*>(&tuple.values[i]), sizeof(int32_t))) {
-            throw std::runtime_error("ExternalMergeSort: run temporal corrupto");
-        }
+    std::string encoded(length, '\0');
+    if (!in.read(encoded.data(), static_cast<std::streamsize>(length))) {
+        throw std::runtime_error("ExternalMergeSort: run temporal corrupto");
     }
+    tuple = TupleCodec::deserialize(encoded.data(), encoded.size());
     return true;
 }
 
@@ -105,7 +103,7 @@ Table ExternalMergeSort::sort(const Table& input,
         size_t end = std::min(input.size(), i + memory_limit_rows);
         Table run(input.begin() + static_cast<std::ptrdiff_t>(i), input.begin() + static_cast<std::ptrdiff_t>(end));
         std::sort(run.begin(), run.end(), [key_column](const Tuple& a, const Tuple& b) {
-            return a.get(key_column) < b.get(key_column);
+            return a.value(key_column) < b.value(key_column);
         });
 
         std::filesystem::path path = make_run_path(temp_dir, runs.size());
@@ -130,8 +128,8 @@ Table ExternalMergeSort::sort(const Table& input,
     result.reserve(input.size());
 
     auto compare = [key_column](const HeapEntry& a, const HeapEntry& b) {
-        int32_t a_key = a.tuple.get(key_column);
-        int32_t b_key = b.tuple.get(key_column);
+        const Value& a_key = a.tuple.value(key_column);
+        const Value& b_key = b.tuple.value(key_column);
         if (a_key != b_key) {
             return a_key > b_key;
         }

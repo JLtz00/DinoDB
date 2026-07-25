@@ -1,4 +1,7 @@
 add_library(query
+    database.cpp
+    sql_parser.cpp
+    tuple.cpp
     seq_scan.cpp
     persistent_table.cpp
     selection.cpp

@@ -20,7 +20,7 @@ El proyecto ya cuenta con una base funcional y probada para la sustentacion prac
 | Storage Manager | Implementado y probado | Archivos binarios, paginas fijas de 4 KB, Slot Directory, insercion, lectura, eliminacion, compactacion y persistencia. |
 | Buffer Manager | Implementado y probado | Buffer Pool configurable, Page Table, LRU, pin/unpin, dirty bit, flush y metricas de hit rate. |
 | B+ Tree Index | Implementado y probado | Nodos almacenados como paginas mediante Buffer Manager, busqueda puntual, rango, split de hojas, split de nodos internos, altura mayor a 2 y metadatos persistentes. |
-| Query Processor | Implementado y probado | Modelo Volcano con `SeqScan` en memoria o sobre paginas persistentes, `Selection`, `Projection`, `NestedLoopJoin`, `ExternalMergeSort` con runs temporales e `IndexScan` sobre tablas en memoria o persistentes. |
+| Query Processor | Implementado y probado | Parser SQL con `INT`, `TEXT`, `DATE` y `HOUR`, catalogo persistente y planes Volcano con `SeqScan`, `Selection`, `Projection`, `NestedLoopJoin`, `ExternalMergeSort` e `IndexScan`. |
 | Demo final | Implementada | Ejecutable `dinodb_demo` que carga 10,000 registros, construye indice, compara scan secuencial vs indice y muestra metricas del Buffer Manager. |
 
 ---
@@ -31,8 +31,9 @@ El sistema esta organizado en capas. Cada capa superior depende de los servicios
 
 ```text
 +-------------------------------------+
-| Query Processor  (Volcano)          |
-| SeqScan, Selection, Projection,     |
+| SQL + Catalogo + Query Processor    |
+| Parser, SeqScan, Selection,         |
+| Projection,                         |
 | NestedLoopJoin, ExternalMergeSort,  |
 | IndexScan                           |
 +-------------------------------------+
@@ -141,12 +142,65 @@ La suite cubre los modulos principales:
 - `test_query_join`: `NestedLoopJoin`.
 - `test_query_sort`: `ExternalMergeSort` con runs temporales persistidos.
 - `test_query_index`: `IndexScan` puntual y por rango usando B+ Tree.
+- `test_sql_engine`: parser, catalogo, validacion de esquemas, persistencia y
+  planes Volcano generados desde SQL.
 
-Ultima verificacion realizada en `build-local`: 52/52 pruebas exitosas.
+Ultima verificacion: 63/63 pruebas exitosas.
 
 ---
 
-## DinoDB CLI - Semana 13
+## DinoDB SQL
+
+El ejecutable `dinodb_cli` ofrece una consola interactiva sobre tablas
+persistentes:
+
+```bash
+./build/dinodb_cli shell data/mi_base
+```
+
+Ejemplo:
+
+```sql
+CREATE TABLE eventos (
+    id INT,
+    nombre TEXT,
+    fecha DATE,
+    inicio HOUR
+);
+INSERT INTO eventos VALUES (1, 'Examen', '2026-07-24', '14:30');
+INSERT INTO eventos VALUES (2, 'Cierre', DATE '2026-07-31', HOUR '18:00');
+SELECT id, nombre FROM eventos
+WHERE fecha >= '2026-07-01' AND inicio < '18:00';
+SHOW TABLES;
+DESCRIBE eventos;
+```
+
+El lenguaje soporta `INT`, `TEXT`, `DATE` (`YYYY-MM-DD`) y `HOUR`
+(`HH:MM` o `HH:MM:SS`; `TIME` es alias), proyeccion con nombres o `*`, y
+condiciones con `=`, `!=`, `<>`, `<`, `<=`, `>` y `>=`, combinadas con `AND`,
+`OR` y parentesis. Los esquemas viven en `catalog.meta`; cada tabla tiene su
+archivo binario de paginas de 4 KB.
+
+Cada consulta muestra el plan Volcano utilizado, por ejemplo:
+
+```text
+SeqScan(eventos) -> Selection -> Projection
+```
+
+Tambien se puede ejecutar una sentencia directamente:
+
+```bash
+./build/dinodb_cli sql \
+  "SELECT * FROM eventos WHERE fecha = '2026-07-24';" \
+  data/mi_base
+```
+
+La referencia completa esta en
+[`docs/lenguaje_consultas_sql.md`](docs/lenguaje_consultas_sql.md).
+
+---
+
+## DinoDB CLI - Demo B+ Tree
 
 `dinodb_cli` es una demo por comandos enfocada en Storage Manager, Buffer Manager, B+ Tree persistente y consultas por indice mediante `IndexScan`. No intenta ser SQL.
 
@@ -204,10 +258,10 @@ Estas mejoras aumentarian la fidelidad del proyecto como Mini SGBD, pero no son 
 | Mejora | Estado | Objetivo |
 |--------|--------|----------|
 | `SeqScan` sobre paginas reales | Implementado | `PersistentTable` serializa tuplas en slots reales y `SeqScan` puede recorrerlas desde disco. |
-| Tabla persistente | Implementado basico | `PersistentTable` inserta tuplas en paginas, lee por `RID` y permite recorrido secuencial; falta catalogo/esquema general. |
+| Tabla persistente | Implementado | `PersistentTable` inserta tuplas en paginas, lee por `RID` y permite recorrido secuencial; el catalogo SQL conserva nombres y columnas. |
 | `ExternalMergeSort` con runs temporales | Implementado | Escribe runs binarios temporales y los consume durante el merge. |
 | Benchmarks reproducibles | Implementado | `bench_scan_vs_index` y `bench_buffer_hit_rate` generan salida CSV. |
-| CLI basico | Implementado | Expone `init`, `insert`, `insert-bulk`, `find`, `range`, `stats` y `reopen-check` desde terminal. |
+| CLI SQL | Implementado | Expone consola interactiva, parser, catalogo, creacion de tablas, insercion y consultas con condiciones. |
 | Build local recomendado | Documentado | `build-local/` esta ignorado por Git; regenerar con `cmake -S . -B build-local`. |
 
 ---
@@ -229,10 +283,11 @@ Estas tareas mejoran la presentacion final, mantenibilidad y claridad del reposi
 
 ## Limitaciones Conocidas
 
-- No hay parser SQL. Las consultas se construyen directamente con operadores C++.
+- El SQL es deliberadamente pequeno: una tabla por `SELECT` y sin `UPDATE`,
+  `DELETE`, agregaciones, `JOIN` u `ORDER BY`.
 - No hay transacciones, WAL, rollback ni control de concurrencia.
-- No hay catalogo general de tablas e indices; el B+ Tree tiene metadatos propios, pero no existe un catalogo global del SGBD.
-- No hay planner/catologo: `IndexScan` se construye manualmente en C++/CLI y requiere recibir el indice y la tabla.
+- Hay catalogo de tablas y columnas, pero aun no administra indices. `IndexScan`
+  se construye manualmente desde la API C++ y la demo B+ Tree.
 - `ExternalMergeSort` usa runs temporales persistidos, pero el resultado final se materializa como `Table` en memoria.
 - No existe eliminacion completa en B+ Tree con redistribucion/fusion; la consigna la considera opcional o bonus.
 - `dinodb_demo` es reproducible y util para sustentacion, pero no es una aplicacion interactiva.

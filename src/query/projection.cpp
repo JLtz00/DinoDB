@@ -18,7 +18,7 @@ std::optional<Tuple> Projection::next() {
     Tuple projected;
     projected.values.reserve(columns_.size());
     for (size_t column : columns_) {
-        projected.values.push_back(tuple->get(column));
+        projected.values.push_back(tuple->value(column));
     }
     return projected;
 }

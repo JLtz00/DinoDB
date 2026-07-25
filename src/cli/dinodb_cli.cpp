@@ -1,13 +1,19 @@
 #include "buffer/buffer_manager.hpp"
 #include "index/bplus_tree.hpp"
+#include "query/database.hpp"
 #include "query/index_scan.hpp"
 #include "query/persistent_table.hpp"
+#include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -52,9 +58,18 @@ size_t parse_size(const char* text, const std::string& name) {
 }
 
 void print_usage() {
-    std::cout << "DinoDB CLI - Semana 13\n"
-              << "Demo de Storage + Buffer + B+ Tree persistente\n\n"
+    std::cout << "DinoDB CLI - Mini SGBD\n"
+              << "SQL sencillo sobre almacenamiento persistente y modelo Volcano\n\n"
               << "Uso:\n"
+              << "  dinodb_cli shell [data_dir]\n"
+              << "  dinodb_cli sql \"<sentencia>\" [data_dir]\n\n"
+              << "Lenguaje:\n"
+              << "  CREATE TABLE eventos (id INT, nombre TEXT, fecha DATE, hora HOUR);\n"
+              << "  INSERT INTO eventos VALUES (1, 'Demo', '2026-07-24', '14:30');\n"
+              << "  SELECT id, nombre FROM eventos WHERE fecha >= '2026-07-01';\n"
+              << "  SHOW TABLES;\n"
+              << "  DESCRIBE alumnos;\n\n"
+              << "Comandos de la demo B+ Tree anterior:\n"
               << "  dinodb_cli init [data_dir]\n"
               << "  dinodb_cli insert <key> <value> [data_dir]\n"
               << "  dinodb_cli insert-bulk <n> [data_dir]\n"
@@ -63,6 +78,176 @@ void print_usage() {
               << "  dinodb_cli stats [data_dir]\n"
               << "  dinodb_cli reopen-check <key> [data_dir]\n\n"
               << "Por defecto usa data/dinodb_cli_table.db y data/dinodb_cli_index.db.\n";
+}
+
+std::string trim(std::string text) {
+    const std::string whitespace = " \t\r\n";
+    size_t first = text.find_first_not_of(whitespace);
+    if (first == std::string::npos) {
+        return "";
+    }
+    size_t last = text.find_last_not_of(whitespace);
+    return text.substr(first, last - first + 1);
+}
+
+std::optional<size_t> sql_terminator(const std::string& sql) {
+    bool in_string = false;
+    for (size_t i = 0; i < sql.size(); ++i) {
+        if (sql[i] == '\'') {
+            if (in_string && i + 1 < sql.size() && sql[i + 1] == '\'') {
+                ++i;
+                continue;
+            }
+            in_string = !in_string;
+            continue;
+        }
+        if (sql[i] == ';' && !in_string) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+void print_query_result(const QueryResult& result) {
+    if (result.has_rows()) {
+        std::vector<std::vector<std::string>> cells = result.text_rows;
+        for (const Tuple& tuple : result.rows) {
+            std::vector<std::string> row;
+            row.reserve(tuple.size());
+            for (const Value& value : tuple.values) {
+                row.push_back(value.to_string());
+            }
+            cells.push_back(std::move(row));
+        }
+
+        std::vector<size_t> widths(result.columns.size(), 0);
+        for (size_t i = 0; i < result.columns.size(); ++i) {
+            widths[i] = result.columns[i].size();
+        }
+        for (const auto& row : cells) {
+            for (size_t i = 0; i < row.size() && i < widths.size(); ++i) {
+                widths[i] = std::max(widths[i], row[i].size());
+            }
+        }
+
+        auto separator = [&]() {
+            std::cout << '+';
+            for (size_t width : widths) {
+                std::cout << std::string(width + 2, '-') << '+';
+            }
+            std::cout << '\n';
+        };
+        auto print_row = [&](const std::vector<std::string>& row) {
+            std::cout << '|';
+            for (size_t i = 0; i < widths.size(); ++i) {
+                const std::string value = i < row.size() ? row[i] : "";
+                std::cout << ' ' << std::left << std::setw(static_cast<int>(widths[i]))
+                          << value << " |";
+            }
+            std::cout << '\n';
+        };
+
+        separator();
+        print_row(result.columns);
+        separator();
+        for (const auto& row : cells) {
+            print_row(row);
+        }
+        separator();
+    }
+    if (!result.plan.empty()) {
+        std::cout << "Plan: " << result.plan << '\n';
+    }
+    if (!result.message.empty()) {
+        std::cout << result.message << '\n';
+    }
+}
+
+int execute_sql(Database& database, const std::string& statement) {
+    auto start = std::chrono::steady_clock::now();
+    QueryResult result = database.execute(statement);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now() - start);
+    print_query_result(result);
+    std::cout << "Tiempo: " << elapsed.count() << " us\n";
+    return 0;
+}
+
+void print_shell_help() {
+    std::cout << "Finalice cada sentencia SQL con ';'.\n"
+              << "Comandos: .tables, .schema <tabla>, .help, .exit\n"
+              << "Tipos: INT, TEXT, DATE (YYYY-MM-DD), HOUR (HH:MM[:SS])\n"
+              << "SQL: CREATE TABLE, INSERT INTO, SELECT, SHOW TABLES, DESCRIBE\n";
+}
+
+int cmd_shell(const std::filesystem::path& data_dir) {
+    Database database(data_dir);
+    std::cout << "DinoDB SQL (" << data_dir << ")\n"
+              << "Escriba .help para ayuda; .exit para salir.\n";
+
+    std::string pending;
+    std::string line;
+    while (true) {
+        std::cout << (pending.empty() ? "dinodb> " : "   ...> ") << std::flush;
+        if (!std::getline(std::cin, line)) {
+            break;
+        }
+        std::string command = trim(line);
+        if (pending.empty() && !command.empty() && command.front() == '.') {
+            if (command == ".exit" || command == ".quit") {
+                return 0;
+            }
+            try {
+                if (command == ".help") {
+                    print_shell_help();
+                } else if (command == ".tables") {
+                    execute_sql(database, "SHOW TABLES");
+                } else if (command.rfind(".schema ", 0) == 0) {
+                    execute_sql(database, "DESCRIBE " + trim(command.substr(8)));
+                } else {
+                    std::cerr << "Comando desconocido. Use .help\n";
+                }
+            } catch (const std::exception& ex) {
+                std::cerr << "error: " << ex.what() << '\n';
+            }
+            continue;
+        }
+
+        pending += line;
+        pending += '\n';
+        std::optional<size_t> end;
+        while ((end = sql_terminator(pending)).has_value()) {
+            std::string statement = trim(pending.substr(0, *end + 1));
+            pending.erase(0, *end + 1);
+            if (statement.empty() || statement == ";") {
+                continue;
+            }
+            try {
+                execute_sql(database, statement);
+            } catch (const std::exception& ex) {
+                std::cerr << "error: " << ex.what() << '\n';
+            }
+        }
+        pending = trim(pending);
+        if (!pending.empty()) {
+            pending += '\n';
+        }
+    }
+
+    if (!trim(pending).empty()) {
+        try {
+            execute_sql(database, pending);
+        } catch (const std::exception& ex) {
+            std::cerr << "error: " << ex.what() << '\n';
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int cmd_sql(const std::string& statement, const std::filesystem::path& data_dir) {
+    Database database(data_dir);
+    return execute_sql(database, statement);
 }
 
 void print_tuple(const Tuple& tuple) {
@@ -284,6 +469,18 @@ int main(int argc, char** argv) {
         if (command == "help" || command == "--help" || command == "-h") {
             print_usage();
             return 0;
+        }
+        if (command == "shell") {
+            std::filesystem::path data_dir = argc > 2 ? argv[2] : "data";
+            return cmd_shell(data_dir);
+        }
+        if (command == "sql") {
+            if (argc < 3) {
+                print_usage();
+                return 1;
+            }
+            std::filesystem::path data_dir = argc > 3 ? argv[3] : "data";
+            return cmd_sql(argv[2], data_dir);
         }
         if (command == "init") {
             return cmd_init(paths_from_arg(argc, argv, 2));
