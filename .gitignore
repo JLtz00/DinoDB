@@ -8,8 +8,7 @@ cmake-build-*/
 *.out
 
 # Datos generados en ejecución
-data/*.db
-data/*.bin
+/data/
 
 # Documentación generada
 docs/html/
@@ -25,4 +24,3 @@ docs/latex/
 Thumbs.db
 
 Consigna_Trabajo_Final.md
-
