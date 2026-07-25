@@ -85,26 +85,34 @@ Requisitos:
 - Compilador C++17: GCC 12+ o Clang 15+.
 - CMake 3.20 o superior.
 - Git.
+- Conexion a Internet durante la primera configuracion para descargar Google
+  Test mediante CMake.
 
-Se recomienda usar un directorio de build nuevo. Si existe un `build/` antiguo generado desde otra ruta, puede fallar por cache de CMake.
+En Debian o Ubuntu se pueden instalar las herramientas con:
 
 ```bash
-cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
+sudo apt update
+sudo apt install build-essential cmake git
+```
+
+Los comandos siguientes se ejecutan desde la raiz del repositorio. Se
+recomienda usar un directorio de build nuevo. Si existe uno generado desde otra
+ruta, puede fallar por cache de CMake.
+
+```bash
 cmake -S . -B build-local
 cmake --build build-local
 ```
 
-Ejecutar pruebas:
+Los ejecutables quedan dentro de `build-local/`. Para verificar la instalacion:
 
 ```bash
-cd build-local
-ctest --output-on-failure
+./build-local/dinodb_cli --help
 ```
 
 Ejecutar benchmarks reproducibles:
 
 ```bash
-cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
 ./build-local/bench_scan_vs_index 10000 7777
 ./build-local/bench_buffer_hit_rate 256
 ```
@@ -112,7 +120,6 @@ cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
 Ejecutar la demo final:
 
 ```bash
-cd /home/lorenzo/UNSA/2026A/BDII/DinoDB
 ./build-local/dinodb_demo
 ```
 
@@ -131,6 +138,12 @@ Range IndexScan [100,109]: 10 tuplas
 ---
 
 ## Pruebas Automatizadas
+
+Ejecutar toda la suite desde la raiz del repositorio:
+
+```bash
+ctest --test-dir build-local --output-on-failure
+```
 
 La suite cubre los modulos principales:
 
@@ -151,14 +164,20 @@ Ultima verificacion: 63/63 pruebas exitosas.
 
 ## DinoDB SQL
 
-El ejecutable `dinodb_cli` ofrece una consola interactiva sobre tablas
-persistentes:
+Esta seccion contiene todo lo necesario para utilizar el lenguaje de consultas.
+
+### Inicio rapido
+
+Abrir una base persistente en `data/mi_base`:
 
 ```bash
-./build/dinodb_cli shell data/mi_base
+./build-local/dinodb_cli shell data/mi_base
 ```
 
-Ejemplo:
+La consola muestra el prompt `dinodb>`. Cada sentencia SQL debe terminar en
+`;`. Para salir se usa `.exit`.
+
+Sesion completa:
 
 ```sql
 CREATE TABLE eventos (
@@ -167,36 +186,190 @@ CREATE TABLE eventos (
     fecha DATE,
     inicio HOUR
 );
+
 INSERT INTO eventos VALUES (1, 'Examen', '2026-07-24', '14:30');
 INSERT INTO eventos VALUES (2, 'Cierre', DATE '2026-07-31', HOUR '18:00');
+
 SELECT id, nombre FROM eventos
 WHERE fecha >= '2026-07-01' AND inicio < '18:00';
+
 SHOW TABLES;
 DESCRIBE eventos;
+
+.exit
 ```
 
-El lenguaje soporta `INT`, `TEXT`, `DATE` (`YYYY-MM-DD`) y `HOUR`
-(`HH:MM` o `HH:MM:SS`; `TIME` es alias), proyeccion con nombres o `*`, y
-condiciones con `=`, `!=`, `<>`, `<`, `<=`, `>` y `>=`, combinadas con `AND`,
-`OR` y parentesis. Los esquemas viven en `catalog.meta`; cada tabla tiene su
-archivo binario de paginas de 4 KB.
+La base se crea si no existe. Si se vuelve a ejecutar el mismo comando con el
+mismo directorio, las tablas y registros anteriores se recuperan del disco.
 
-Cada consulta muestra el plan Volcano utilizado, por ejemplo:
+### Comandos de la consola
 
-```text
-SeqScan(eventos) -> Selection -> Projection
+| Comando | Funcion |
+|---------|---------|
+| `.help` | Muestra la ayuda resumida. |
+| `.tables` | Lista las tablas; equivale a `SHOW TABLES;`. |
+| `.schema nombre` | Muestra columnas y tipos; equivale a `DESCRIBE nombre;`. |
+| `.exit` o `.quit` | Cierra la consola. |
+
+La consola acepta sentencias de varias lineas y no interpreta un `;` dentro de
+un valor `TEXT` como fin de sentencia.
+
+### Tipos de datos
+
+| Tipo | Formato | Ejemplos |
+|------|---------|----------|
+| `INT` o `INTEGER` | Entero con signo de 32 bits. | `10`, `0`, `-45` |
+| `TEXT` | Texto entre comillas simples. | `'Ana'`, `'Base de Datos II'` |
+| `DATE` | Fecha valida `YYYY-MM-DD`. | `'2026-07-25'`, `DATE '2026-07-25'` |
+| `HOUR` o `TIME` | Hora `HH:MM` o `HH:MM:SS`. | `'08:30'`, `TIME '14:05:20'` |
+
+Las horas se muestran normalizadas como `HH:MM:SS`. Las fechas se validan,
+incluyendo dias por mes y anos bisiestos. Para guardar una comilla simple en
+`TEXT`, se escribe dos veces:
+
+```sql
+INSERT INTO autores VALUES (1, 'Flannery O''Connor');
 ```
 
-Tambien se puede ejecutar una sentencia directamente:
+### Crear tablas
+
+```sql
+CREATE TABLE personas (
+    id INT,
+    nombre TEXT,
+    nacimiento DATE,
+    ingreso HOUR
+);
+```
+
+Los nombres de tablas y columnas no distinguen mayusculas de minusculas, se
+guardan en minusculas y deben comenzar con una letra o `_`. Solo pueden
+contener letras, digitos y `_`.
+
+No se puede crear dos veces la misma tabla ni repetir nombres de columnas.
+
+### Insertar registros
+
+```sql
+INSERT INTO personas
+VALUES (1, 'Ana Torres', '2001-04-12', '08:30');
+
+INSERT INTO personas
+VALUES (2, 'Luis O''Connor', DATE '1999-11-03', TIME '14:15:30');
+```
+
+`INSERT` agrega un registro por sentencia. Los valores son posicionales y deben
+tener la misma cantidad, orden y tipo que las columnas declaradas.
+
+### Consultar registros
+
+Consultar todas las columnas y filas:
+
+```sql
+SELECT * FROM personas;
+```
+
+Proyectar columnas concretas:
+
+```sql
+SELECT id, nombre FROM personas;
+```
+
+Filtrar registros:
+
+```sql
+SELECT nombre, nacimiento
+FROM personas
+WHERE nacimiento >= '2000-01-01';
+```
+
+Comparadores soportados:
+
+| Operador | Significado |
+|----------|-------------|
+| `=` | Igual |
+| `!=` o `<>` | Diferente |
+| `<` y `<=` | Menor y menor o igual |
+| `>` y `>=` | Mayor y mayor o igual |
+
+Las condiciones se pueden combinar con `AND`, `OR` y parentesis. `AND` tiene
+mayor precedencia que `OR`:
+
+```sql
+SELECT id, nombre
+FROM personas
+WHERE nacimiento >= '2000-01-01'
+  AND (ingreso < '12:00' OR nombre = 'Ana Torres');
+```
+
+Las comparaciones deben usar valores compatibles con el tipo de la columna.
+Los textos se comparan de forma lexicografica y distinguen mayusculas.
+
+### Consultar el catalogo
+
+```sql
+SHOW TABLES;
+DESCRIBE personas;
+```
+
+`SHOW TABLES` lista las tablas de la base actual. `DESCRIBE` muestra el nombre y
+tipo de cada columna.
+
+### Ejecutar una sentencia sin abrir la consola
+
+El subcomando `sql` recibe la sentencia completa y, opcionalmente, el
+directorio de la base:
 
 ```bash
-./build/dinodb_cli sql \
-  "SELECT * FROM eventos WHERE fecha = '2026-07-24';" \
+./build-local/dinodb_cli sql \
+  "SELECT * FROM personas WHERE nacimiento >= '2000-01-01';" \
   data/mi_base
 ```
 
-La referencia completa esta en
-[`docs/lenguaje_consultas_sql.md`](docs/lenguaje_consultas_sql.md).
+Si no se indica el directorio, se utiliza `data/`.
+
+### Plan Volcano
+
+Cada `SELECT` se traduce a operadores Volcano reales y la CLI imprime el plan
+utilizado:
+
+```text
+SeqScan(personas) -> Selection -> Projection
+```
+
+Sin una clausula `WHERE`, se omite `Selection`. La ejecucion llama a `open()`,
+consume filas mediante `next()` y termina con `close()`.
+
+### Archivos persistentes
+
+Para el ejemplo `data/mi_base`, DinoDB crea:
+
+```text
+data/mi_base/
+├── catalog.meta
+├── eventos.table.db
+└── personas.table.db
+```
+
+`catalog.meta` almacena esquemas y tipos. Cada archivo `*.table.db` guarda
+registros tipados dentro de paginas de 4 KB con Slot Directory. El formato
+actual puede leer los catalogos y registros antiguos que solo contenian
+enteros.
+
+### Errores que valida el motor
+
+- Tabla inexistente o duplicada.
+- Columna inexistente o repetida.
+- Cantidad incorrecta de valores en `INSERT`.
+- Incompatibilidad de tipos.
+- Enteros fuera del rango de 32 bits.
+- Fechas y horas invalidas.
+- Cadenas sin comilla de cierre.
+- Sintaxis incompleta o texto adicional despues de una sentencia.
+
+La documentacion tecnica ampliada del formato interno tambien esta disponible
+en [`docs/lenguaje_consultas_sql.md`](docs/lenguaje_consultas_sql.md), pero no
+es necesaria para utilizar la CLI.
 
 ---
 
