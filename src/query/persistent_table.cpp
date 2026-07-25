@@ -1,34 +1,8 @@
 #include "query/persistent_table.hpp"
-#include <cstring>
+#include "query/tuple_codec.hpp"
 #include <limits>
 #include <stdexcept>
 #include <string>
-
-namespace {
-
-void append_u16(std::string& out, uint16_t value) {
-    const char* bytes = reinterpret_cast<const char*>(&value);
-    out.append(bytes, sizeof(value));
-}
-
-void append_i32(std::string& out, int32_t value) {
-    const char* bytes = reinterpret_cast<const char*>(&value);
-    out.append(bytes, sizeof(value));
-}
-
-uint16_t read_u16(const char* data) {
-    uint16_t value = 0;
-    std::memcpy(&value, data, sizeof(value));
-    return value;
-}
-
-int32_t read_i32(const char* data) {
-    int32_t value = 0;
-    std::memcpy(&value, data, sizeof(value));
-    return value;
-}
-
-} // namespace
 
 PersistentTable::PersistentTable(DiskManager* disk_manager)
     : disk_(disk_manager)
@@ -105,36 +79,9 @@ page_id_t PersistentTable::page_count() const {
 }
 
 std::string PersistentTable::serialize(const Tuple& tuple) {
-    if (tuple.values.size() > std::numeric_limits<uint16_t>::max()) {
-        throw std::runtime_error("PersistentTable::serialize: demasiadas columnas");
-    }
-
-    std::string encoded;
-    encoded.reserve(sizeof(uint16_t) + tuple.values.size() * sizeof(int32_t));
-    append_u16(encoded, static_cast<uint16_t>(tuple.values.size()));
-    for (int32_t value : tuple.values) {
-        append_i32(encoded, value);
-    }
-    return encoded;
+    return TupleCodec::serialize(tuple);
 }
 
 Tuple PersistentTable::deserialize(const char* data, offset_t length) {
-    if (length < sizeof(uint16_t)) {
-        throw std::runtime_error("PersistentTable::deserialize: registro corrupto");
-    }
-
-    uint16_t columns = read_u16(data);
-    size_t expected = sizeof(uint16_t) + static_cast<size_t>(columns) * sizeof(int32_t);
-    if (length != expected) {
-        throw std::runtime_error("PersistentTable::deserialize: longitud invalida");
-    }
-
-    Tuple tuple;
-    tuple.values.reserve(columns);
-    const char* cursor = data + sizeof(uint16_t);
-    for (uint16_t i = 0; i < columns; ++i) {
-        tuple.values.push_back(read_i32(cursor));
-        cursor += sizeof(int32_t);
-    }
-    return tuple;
+    return TupleCodec::deserialize(data, length);
 }

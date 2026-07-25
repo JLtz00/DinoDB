@@ -44,3 +44,28 @@ TEST(QueryWeek13Test, ExternalMergeSortUsaRunsTemporales) {
     EXPECT_EQ(leftovers, 0u);
     std::filesystem::remove_all(temp_dir);
 }
+
+TEST(QueryWeek13Test, ExternalMergeSortOrdenaTextDateYHour) {
+    Table text_input {
+        Tuple {{ Value::text("zorro"), Value::date("2026-01-03") }},
+        Tuple {{ Value::text("abeja"), Value::date("2026-01-02") }},
+        Tuple {{ Value::text("mono"), Value::date("2026-01-01") }}
+    };
+    Table text_sorted = ExternalMergeSort::sort(text_input, 0, 1);
+    ASSERT_EQ(text_sorted.size(), 3u);
+    EXPECT_EQ(text_sorted[0].value(0).as_text(), "abeja");
+    EXPECT_EQ(text_sorted[2].value(0).as_text(), "zorro");
+
+    Table date_sorted = ExternalMergeSort::sort(text_input, 1, 2);
+    EXPECT_EQ(date_sorted[0].value(1).to_string(), "2026-01-01");
+    EXPECT_EQ(date_sorted[2].value(1).to_string(), "2026-01-03");
+
+    Table hour_input {
+        Tuple {{ Value::hour("18:00") }},
+        Tuple {{ Value::hour("07:30:05") }},
+        Tuple {{ Value::hour("12:15") }}
+    };
+    Table hour_sorted = ExternalMergeSort::sort(hour_input, 0, 1);
+    EXPECT_EQ(hour_sorted[0].value(0).to_string(), "07:30:05");
+    EXPECT_EQ(hour_sorted[2].value(0).to_string(), "18:00:00");
+}
